@@ -59,4 +59,4 @@ allstdata = pd.merge(allstations,stationperiods)
 #This creates a dataframe that focus on the columns and variables of interest. 
 sttempdata=allstdata[allstdata['Element'].isin(["TAVG","TMAX","TMIN","PRCP","SNOW"])]
 #STILL NEED TO DROP SOME COLUMSN.
-#sttempdata.drop(['Elevation (0.1m)', 'Name','Other1','Other2','Country'], axis=1, inplace=True)
+sttempdata=sttempdata[['ID','Lat', 'Lon', 'Element', 'Firstyear', 'Lastyear']]
