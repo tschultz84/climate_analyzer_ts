@@ -16,8 +16,10 @@ from math import radians, cos, sin, asin, sqrt
 #This function takes as an input, a Point(lon,lat) that is the 
 #reference point of interest
 #It then searches for the nearest point in our list of points,
-#searching distance by degree distance (not miles)
+#searching distance by miles distance
 #It returns the top 10 nearest stations, ordered
+#This is returned in the foramt of a dataframe.
+#The first row of the returned dataframe is the reference point. 
 
 def nearest_station(pt):
 
