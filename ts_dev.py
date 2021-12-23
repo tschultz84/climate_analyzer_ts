@@ -1,17 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Spyder Editor
+Created on Thu Dec 23 06:51:09 2021
 
-This is a temporary script file.
+@author: 14154
 """
-import shapely
-from shapely.geometry import Point,MultiPoint,Polygon
-from shapely.ops import nearest_points
-import geopandas as gpd
-import pandas as pd
-from math import radians, cos, sin, asin, sqrt
-
-
+import time
 #%%
 #This function takes as an input, a Point(lon,lat) that is the 
 #reference point of interest
@@ -21,7 +14,7 @@ from math import radians, cos, sin, asin, sqrt
 #This is returned in the foramt of a dataframe.
 #The first row of the returned dataframe is the reference point. 
 
-def nearest_station(pt):
+def nearest_station_dev(pt):
    #startTime = time.time()
    #DATAPATH is just where ghcnd-stations and ghcnd-inventory are located on your hard drive.
    stDATAPATH = "C:\\ts_big_data_files\\"
@@ -94,33 +87,6 @@ def nearest_station(pt):
 
 
 #%%
-#This function returns the miles between two poitns
-#def ts_latlon_distance(lat1, lat2, lon1, lon2):
-def ts_latlon_distance(latlon1,latlon2):
-    # radians which converts from degrees to radians.
-    lon1 = radians(latlon1[1])
-    lon2 = radians(latlon2[1])
-    lat1 = radians(latlon1[0])
-    lat2 = radians(latlon2[0])
-    
-    """
-    # The math module contains a function named
-    # radians which converts from degrees to radians.
-    lon1 = radians(lon1)
-    lon2 = radians(lon2)
-    lat1 = radians(lat1)
-    lat2 = radians(lat2)
-      """
-    # Haversine formula
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
-    a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
- 
-    c = 2 * asin(sqrt(a))
-    
-    # Radius of earth in kilometers. Use 3956 for miles
-    r = 3956
-      
-    # calculate the result, returned in miles
-    return(c * r)
-     
+test = Point(-111.04060494981753,45.647256643331126)
+rf=nearest_station_dev(test)
+#nearest_station_dev_1(test)
