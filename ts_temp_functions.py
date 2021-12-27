@@ -10,6 +10,10 @@ from shapely.ops import nearest_points
 import geopandas as gpd
 import pandas as pd
 from math import radians, cos, sin, asin, sqrt
+import time
+import os
+import sys
+import yaml
 
 
 #%%
@@ -93,7 +97,7 @@ class FindStation :
        #to all of the nearest 20 stations.
        d1er=[]
        for i in range(0,len(otw)):
-           d1er.append(ts_latlon_distance([pt.y,pt.x],otw.iloc[i][['Latitude','Longitude']]))
+           d1er.append(self.ts_latlon_distance([pt.y,pt.x],otw.iloc[i][['Latitude','Longitude']]))
           
        #This appends the data series to the final return dataframe
        otw['Miles_from_Ref']=d1er
@@ -139,14 +143,6 @@ class FindStation :
         lat1 = radians(latlon1[0])
         lat2 = radians(latlon2[0])
         
-        """
-        # The math module contains a function named
-        # radians which converts from degrees to radians.
-        lon1 = radians(lon1)
-        lon2 = radians(lon2)
-        lat1 = radians(lat1)
-        lat2 = radians(lat2)
-          """
         # Haversine formula
         dlon = lon2 - lon1
         dlat = lat2 - lat1
@@ -160,3 +156,67 @@ class FindStation :
         # calculate the result, returned in miles
         return(c * r)
          
+#%%
+#This object contains the functions to read in key data about a station.
+#Its input is a station ID. 
+class StationReader:
+    def __init__(self,stationID):
+        self.stid = stationID
+        
+        #This YAML file contains a great deal of static information, 
+        #such as directory information. 
+        yaml_file = open("load_stats_static.yaml")
+        self.yaml = yaml.load(yaml_file, Loader=yaml.FullLoader)
+        
+        
+        self.datapath= self.yaml['DATAPATH']
+
+        
+    #This loads the station, using the station ID which is passed.
+    def load_station(self,station):
+        
+        startTime = time.time()
+        if station == None:
+            station=self.stid
+        #This assigns the filename where station info is located.
+        filename=self.datapath+str(station)+'.dly'
+        #This checks the file exists and breask if it does not.
+        #(If it doesn't exist, the submitted station ID was in error.)
+        if os.path.exists(filename) == False:
+            print("Bad Station ID. The file called "+filename+" does not exist.")
+            print("Please check your station ID "+str(station)+" and re-submit.")
+            sys.exit("Break Error in load_station of StationReader: Bad Station ID.")
+        #You have designed this script so it only reads in the lines where data is useful
+        #and excludes other elements. 
+        #When testing reading in the very largest data file, you would typically save
+        #0.02 to 0.06 seconds during loading. Worth every bit...
+        
+        #This defines the pre-loading data, i.e. which columns are used to skip rows.
+        shortcols = [ (17, 21)]
+        shortnames =  np.array([ 'Element'])
+        
+        #This is to test whether the prelim, read-in step, helps or hinder the read time
+        
+        print("Stripping out extraneous rows before reading everything in...")
+        #This then reads the file, but only the columns which generate the rows to skip. 
+        prelim = pd.DataFrame()    
+        prelim=pd.read_fwf(filename,colspecs=shortcols)
+        prelim.columns=shortnames
+        #This generates the rows to skip.   
+        #Currently you are keeping only TMAX and TMIN
+        tokeep=['TMAX','TMIN']
+        skiprows1 = prelim[(~prelim['Element'].isin(tokeep))].index
+        
+        
+        #Then, the data is read in.
+        inter0 = pd.DataFrame()      
+        #This then Reads out the next file.  
+        inter0 = pd.read_fwf(filename,colspecs=self.yaml['datacolnums'],skiprows=skiprows1+1)
+        inter0.columns=self.yaml['datacolnames']
+            
+ 
+            
+        self.station_data=inter0
+        executionTime = (time.time() - startTime)
+        print('Time taken to load station data using load_station: ' + str(executionTime))
+        return inter0
