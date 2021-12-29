@@ -14,11 +14,29 @@
 
 #This array contains the number of columns, if they are imported with no flags
 ---
+#==============
+#DIRECTORIES AND FILE LOCATIONS
+
 #DATAPATH is just where ghcnd-stations and ghcnd-inventory are located on your hard drive.
     DATAPATH : "C:\\ts_big_data_files\\Temperature-Datasets\\ghcnd_all\\"
 
 #STATIONMETA is the file containing all the lat / lon information for the stations.
     STATIONMETA : "C:\\ts_big_data_files\\ghcnd_station_master_ts_tmax.csv"
+
+#==============
+#HARDCODED PARAMETERS
+    #BASEYEAR is the year before which station data must be availbale. 
+    #stations with no data prior to this year are not loaded. 
+    BASEYEAR : 2000
+    
+    #This is the lat/lon distance within which weather stations are serached.
+    #This is used to streamline how fast the "closest station" function works. 
+            #stations are only sorted by distance if they rae within +/- coord_radius
+            #of the reference point. 
+    SEARCH_RADIUS : 1
+
+#=============
+#REQUIRED SPECIFICTIONS TO LOAD .DLY FILES
 
     datacolnums :
         - !!python/tuple [0, 11]
