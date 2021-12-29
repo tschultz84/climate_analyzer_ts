@@ -17,6 +17,9 @@
 #DATAPATH is just where ghcnd-stations and ghcnd-inventory are located on your hard drive.
     DATAPATH : "C:\\ts_big_data_files\\Temperature-Datasets\\ghcnd_all\\"
 
+#STATIONMETA is the file containing all the lat / lon information for the stations.
+    STATIONMETA : "C:\\ts_big_data_files\\ghcnd_station_master_ts_tmax.csv"
+
     datacolnums :
         - !!python/tuple [0, 11]
         - !!python/tuple [11, 15]
