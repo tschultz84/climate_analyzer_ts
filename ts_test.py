@@ -24,9 +24,16 @@ tes7=test5.load_station('CA1AB000158')
 
 #%%
 test10=LoadStation([45.647256643331126,-111.04060494981753],10,True,True) #Loading in Bozeman, MT coordinates
-#print(test10.closest_stations)
-#print(test10.station_data)
+print(test10.closest_stations)
+print(test10.station_data)
 
 #%%
-test11=LoadStation([37.755663644,-122.506497974],20,True,True) #Loading in Ocean Beach, SF coordinates
-#print(test11.station_data)
+test11=LoadStation([37.755663644,-122.506497974],10,True,True) #Loading in Ocean Beach, SF coordinates
+
+print(test11.station_data)
+print(test11.closest_stations)
+#%%
+test12=LoadStation([32.741947,-117.239571],10,True,True) #Loading in Ocean Beach, San Diego coordinates
+
+print(test12.station_data)
+print(test12.closest_stations)
