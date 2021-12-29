@@ -11,6 +11,7 @@ import os
 import sys
 import yaml
 import numpy as np
+from datetime import date
 
 
 #%%
@@ -43,11 +44,6 @@ class LoadStation :
 
         self.refpoint=Point(point[1],point[0])
         
-        #This is the lat, lon coordinates range near the ref point which are searched.
-        #stations are only sorted by distance if they rae within +/- coord_radius
-        #of the reference point. 
-        self.coord_radius = 1
-
         #This YAML file contains a great deal of static information, 
         #such as directory information. 
         yaml_file = open("load_stats_static.yaml")
@@ -76,13 +72,26 @@ class LoadStation :
        #It only reads in the columns which are necessary to search by distance. 
        #It also searches only for the TMAX values. 
        #df = pd.read_csv(stDATAPATH+'ghcnd_station_master_ts_tmax.csv')[['ID','Name','Latitude','Longitude']].drop_duplicates()
-       df = pd.read_csv(self.yaml['STATIONMETA'])[['ID','Name','Latitude','Longitude']].drop_duplicates()
+       df = pd.read_csv(self.yaml['STATIONMETA'],
+                        dtype={'Firstyear': np.int64,'Lastyear': np.int64})[['ID','Name','Latitude','Longitude','Firstyear','Lastyear']].drop_duplicates()
+       
+       #These lines strip out stations where there is no recent data (from within the last year), 
+       recentyear=date.today().year-1
+       df = df[df['Lastyear']>=recentyear] 
+       #and then strips out stations for which data is only very very recent. 
+       baseyear=self.yaml['BASEYEAR']
+       df = df[df['Firstyear']<=baseyear] 
+       
+       #Now drops the year info, since we don't need it.
+       df=df[['ID','Name','Latitude','Longitude']]
+           
+       
        #This steps strips out lat and lon values that are not nearby, reducing the number
        #of distance computations required.
        #Using this limiter reduced the time to run this script by an entire second,
        #from 1.2 seconds when searching all 40,000 rows with TMAX,
        #to 0.1 seconds, when searching within 0.25 lat /lon degrees
-       bar=self.coord_radius
+       bar=self.yaml['SEARCH_RADIUS']
        df=df[df['Longitude']>pt.x-bar]
        df=df[df['Longitude']<pt.x+bar]
        df=df[df['Latitude']>pt.y-bar]
@@ -100,8 +109,10 @@ class LoadStation :
            df=df[df['Latitude']<pt.y+bar1]
        
         #Prints th enumber of stations being searched.
-       if self.display: print("Searching closest station among "
-                              +str(len(df))+" stations within "+str(self.coord_radius)+" degrees of the reference.")
+       if self.display: 
+           print("Searching closest station among "
+                              +str(len(df))+" stations within "+str(self.yaml['SEARCH_RADIUS'])+" degrees of the reference.")
+           print("This only includes stations with data available more recently than "+str(recentyear)+" and before "+str(self.yaml['BASEYEAR']))
        #This then transforms the initial data series into a GeoSeries of points   
        t1=gpd.GeoSeries(gpd.points_from_xy(df.Longitude, df.Latitude))
        #Then evaluates the distance between pt and each entry in the data series
