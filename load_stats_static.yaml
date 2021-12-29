@@ -15,7 +15,7 @@
 #This array contains the number of columns, if they are imported with no flags
 ---
 #DATAPATH is just where ghcnd-stations and ghcnd-inventory are located on your hard drive.
-    DATAPATH : "C:\\ts_big_data_files\\Temperature-Datasets\\ghcnd_all\\ghcnd_all\\"
+    DATAPATH : "C:\\ts_big_data_files\\Temperature-Datasets\\ghcnd_all\\"
 
     datacolnums :
         - !!python/tuple [0, 11]

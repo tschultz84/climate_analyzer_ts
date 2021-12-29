@@ -102,3 +102,5 @@ test10=test1.nearest_station()
 
 test55=StationReader(test1.id_closest_st)
 test66=test55.load_station(None)
+#%%
+tes7=test5.load_station('CA1AB000158')
