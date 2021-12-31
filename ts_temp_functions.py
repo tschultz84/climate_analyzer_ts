@@ -51,8 +51,10 @@ class LoadStation :
         
         #This automatically runs the functions.
         if autorun==True:
-            self.nearest_station()
-            self.load_station()
+            self.closest_stations = self.nearest_station()
+            self.station_data=self.load_station(self.closest_stations.iloc[1,0])
+            self.station_data_clean=self.StationDataCleaner()
+            self.station_data_clean=self.calculate_tmid(self.station_data_clean)
     """    
     #This function as a default takes the LoadStation object's
     #reference point of interest and searches for the nearest point in our list of points,
@@ -136,7 +138,7 @@ class LoadStation :
        #and then sorts by miles from ref, to find the closest stations
        returner=otw.sort_values(by='Miles_from_Ref')
        
-       #Then return the closest 10 stations.
+       #Then return the closest numstats stations.
        returner=returner[0:self.numstats]
        
        #This sets a variable which is the ID Of the nearest station
@@ -162,7 +164,7 @@ class LoadStation :
        if(self.display):
            executionTime = (time.time() - startTime)
            print("Time taken to locate nearest "+str(self.numstats)+" weather stations." + str(executionTime))
-       self.closest_stations = final
+    
        return final
     
 
@@ -240,49 +242,73 @@ class LoadStation :
             executionTime = (time.time() - startTime)
             print('Time taken to load data for +'+str(station)+' using load_station: ' + str(executionTime))
         return inter0
-        
-        startTime = time.time()
-        if station == None:
-            station=self.stid
-        #This assigns the filename where station info is located.
-        filename=self.datapath+str(station)+'.dly'
-        #This checks the file exists and breask if it does not.
-        #(If it doesn't exist, the submitted station ID was in error.)
-        if os.path.exists(filename) == False:
-            print("Bad Station ID. The file called "+filename+" does not exist.")
-            print("Please check your station ID "+str(station)+" and re-submit.")
-            sys.exit("Break Error in load_station of StationReader: Bad Station ID.")
-        #You have designed this script so it only reads in the lines where data is useful
-        #and excludes other elements. 
-        #When testing reading in the very largest data file, you would typically save
-        #0.02 to 0.06 seconds during loading. Worth every bit...
-        
-        #This defines the pre-loading data, i.e. which columns are used to skip rows.
-        shortcols = [ (17, 21)]
-        shortnames =  np.array([ 'Element'])
-        
-        #This is to test whether the prelim, read-in step, helps or hinder the read time
-        
-        print("Stripping out extraneous rows before reading everything in...")
-        #This then reads the file, but only the columns which generate the rows to skip. 
-        prelim = pd.DataFrame()    
-        prelim=pd.read_fwf(filename,colspecs=shortcols)
-        prelim.columns=shortnames
-        #This generates the rows to skip.   
-        #Currently you are keeping only TMAX and TMIN
-        tokeep=['TMAX','TMIN']
-        skiprows1 = prelim[(~prelim['Element'].isin(tokeep))].index
-        
-        
-        #Then, the data is read in.
-        inter0 = pd.DataFrame()      
-        #This then Reads out the next file.  
-        inter0 = pd.read_fwf(filename,colspecs=self.yaml['datacolnums'],skiprows=skiprows1+1)
-        inter0.columns=self.yaml['datacolnames']
-            
  
+    
+    """
+      This takes in data for single weather station - in the format of output from
+      load_station
+      and cleans it up. 
+      The only input is stationd, which, if =None, just defaults to using data frmo
+      self.station_data
+      Currently these cleaning operations are completed:
+          *Change -9999 values to np.nan
+    """
+    def StationDataCleaner(self,stationd=None):
+        #If station=d is none, just default to using self.station_data
+        if stationd==None: stationd = self.station_data
+        #Does the swap of -9999 for np.nan
+        returner = stationd.replace(-9999,np.nan) 
+        
+        #Converting frmo tenths of degrees F to F.
+        returner.iloc[:,-31:] = returner.iloc[:,-31:]/10
+        
+        return returner
+    
+    def calculate_tmid(self,stationd):
+        if self.display==True: startTime = time.time()
+        
+        #Finds the earliest and latest years.
+        yrmin = stationd['Year'].min()
+        yrmax = stationd['Year'].max()
+
+
+        stationd=stationd.sort_values(by=['Year','Month'])
+        statID=stationd.iloc[0,0]
+        tmiddata=pd.DataFrame()
+
+        #The ' k' loop is over all elements.
+        for k in np.arange(0,len(stationd)-1):
+       # for k in np.arange(0,10):
+            #This initializes the temporary dataframes. 
+            calc=pd.DataFrame()
+            calcint=pd.DataFrame()
+            #This extracts the data for the right year and months.
+            calcmax = stationd.iloc[k]
+            calcmin = stationd.iloc[k+1]
             
-        self.station_data=inter0
-        executionTime = (time.time() - startTime)
-        print('Time taken to load station data using load_station: ' + str(executionTime))
-        return inter0
+            if calcmax['Element'] == "TMAX" and calcmin['Element'] == "TMIN":
+                if calcmax['Year'] == calcmin['Year'] and calcmax['Month'] == calcmin['Month']:
+                      
+                    #This combines TMAX and TMIN values, such that the average can be taken. 
+                    calcint1=pd.concat([calcmax,calcmin],axis=1)
+                   # returner=calcint1
+                    #This calcualtes the TMID values, which are the average of 
+                    #TMAX and TMIN.
+                    #It is importnat that skipna=FAlse, which ensures that
+                    #if either tMAX or TMIN is NaN, then so is the result for TMID.
+                    calcint = calcint1.iloc[4:].sum(axis=1,skipna=False)/2
+                    #print(calcint)
+                    #This inserts back in the missing collumns. 
+                    calcint['Year']=calcmax['Year']
+                    calcint['Month']=calcmax['Month']
+                    calcint['Element']='TMID'
+                    calcint['Station_ID']=statID
+                    #And this appends the new row to the returned dataframe. 
+                    tmiddata=tmiddata.append(calcint,ignore_index=True)
+        returner=stationd.append(tmiddata)
+
+        if self.display==True: 
+            executionTime = (time.time() - startTime)
+            print("Time taken to create TMID by going through rows " + str(executionTime))
+        return returner
+        

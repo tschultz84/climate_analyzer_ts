@@ -35,5 +35,5 @@ print(test11.closest_stations)
 #%%
 test12=LoadStation([32.741947,-117.239571],10,True,True) #Loading in Ocean Beach, San Diego coordinates
 
-print(test12.station_data)
-print(test12.closest_stations)
+print(test12.station_data_clean)
+#print(test12.closest_stations)
