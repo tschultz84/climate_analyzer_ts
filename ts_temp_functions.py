@@ -259,8 +259,11 @@ class LoadStation :
         #Does the swap of -9999 for np.nan
         returner = stationd.replace(-9999,np.nan) 
         
-        #Converting frmo tenths of degrees F to F.
+        #Converting frmo tenths of degrees C to C.
         returner.iloc[:,-31:] = returner.iloc[:,-31:]/10
+        
+        #Convert from Celsius to Farnehit
+        returner.iloc[:,-31:] = (returner.iloc[:,-31:]*9/5)+32
         
         return returner
     
@@ -312,3 +315,47 @@ class LoadStation :
             print("Time taken to create TMID by going through rows " + str(executionTime))
         return returner
         
+#All analysis fucntions for a station are done in this object.
+#The input is stationdata, which shoudl be self.station_data_claned from the StationLoad object
+#the refperiod is a 2 element list of start and end, reference period of analysis
+#autorun simply immediately runs the KPI key_metrics function if True 
+
+class StationAnalyzer :
+    def __init__(self,stationdata,refperiod=[np.datetime64('2020-01-31'),np.datetime64('2020-12-31')],autorun=True):
+        
+        #separates out the different variables ofinterest.
+        self.station_data_tmid=stationdata[stationdata['Element']=='TMID']
+        self.station_data_tmax=stationdata[stationdata['Element']=='TMAX']
+        self.station_data_tmin=stationdata[stationdata['Element']=='TMIN']
+        
+        self.refstart=refperiod[0]
+        self.refend=refperiod[1]
+        
+        #Runs the key_metrics function if desired
+        if autorun==True:
+            self.kpi=self.key_metrics()
+            #print(self.kpi)
+        
+    #This creates a table (pd dataframe) of the key metrics of interest
+    def key_metrics(self):
+        
+        whole_tmid_mean=np.nanmean(self.station_data_tmid.iloc[:,-31:])
+        whole_tmax=np.nanmax(self.station_data_tmax.iloc[:,-31:])
+        whole_tmin=np.nanmin(self.station_data_tmin.iloc[:,-31:])
+        
+        #This finds the index location of the max temperature.
+        maxloc=np.where(self.station_data_tmax.iloc[:,-31:]==whole_tmax)
+        maxyear=  int( self.station_data_tmax.iloc[int(maxloc[0]),1]     )
+        maxmonth  =  int( self.station_data_tmax.iloc[int(maxloc[0]),2]  )
+        maxday  =   self.station_data_tmax.columns[int(maxloc[1])]  
+        maxdate=str(maxyear)+'-'+str(maxmonth)+"-"+str(maxday[-2:])
+
+        returner = pd.DataFrame(
+            {"TMID_av_F_entire_record":[whole_tmid_mean],
+             "TMAX_F_entire_record":[whole_tmax],
+             "TMAX_date":[maxdate],
+             "TMIN_F_entire_record":[whole_tmin]
+             
+             }
+            )
+        return returner           
