@@ -23,30 +23,33 @@ test66=test55.load_station(None)
 tes7=test5.load_station('CA1AB000158')
 
 #%%
-test10=LoadStation([45.647256643331126,-111.04060494981753],10,True,True) #Loading in Bozeman, MT coordinates
-#print(test10.station_data)
-datar=test10.station_data_clean
-print(datar)
+bzdata=LoadStation([45.647256643331126,-111.04060494981753],10,True,True) #Loading in Bozeman, MT coordinates
 
 #%%
-test11=LoadStation([37.755663644,-122.506497974],10,True,True) #Loading in Ocean Beach, SF coordinates
+bzcalc=StationAnalyzer(bzdata.station_data_clean)
+print(bzcalc.kpi)
+bzcalc.key_charts()
 
-print(test11.station_data_clean)
-print(test11.station_data)
+#%%
+obdata=LoadStation([37.755663644,-122.506497974],10,True,True) #Loading in Ocean Beach, SF coordinates
+#%%
+obcalc=StationAnalyzer(obdata.station_data_clean)
+
+print(obcalc.kpi)
+obcalc.key_charts()
+
 #%%
 test12=LoadStation([32.741947,-117.239571],10,True,True) #Loading in Ocean Beach, San Diego coordinates
 #%%
-print(test12.station_data_clean)
-#print(test12.closest_stations)
+dvtdata=LoadStation([32.659167, -116.099167],10,True,True) #Loading in Desert View Tower data
+#%%
+dvtcalc=StationAnalyzer(dvtdata.station_data_clean)
+print(dvtcalc.kpi)
+#testdvt.key_charts()
 
 #%%
 
-test50=StationAnalyzer(datar)
-print(test50.kpi.iloc[:,0:3])
-
-
 #%%
-                                           
-test60=StationAnalyzer(test11.station_data_clean)
-print(test60.kpi.iloc[:,0:3])
+
+
 

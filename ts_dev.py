@@ -18,3 +18,7 @@ data11=data1[data1['Year']==1952]
 print(data11[data11['Element']=='TMAX'])
 print(data11[data11['Element']=='TMIN'])
 print(data11[data11['Element']=='TMID'])
+
+
+#%%
+

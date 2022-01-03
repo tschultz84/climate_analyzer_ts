@@ -12,6 +12,7 @@ import sys
 import yaml
 import numpy as np
 from datetime import date
+import matplotlib.pyplot as plt
 
 
 #%%
@@ -73,13 +74,12 @@ class LoadStation :
        #This initializes the actual data to search, from the list of stations
        #It only reads in the columns which are necessary to search by distance. 
        #It also searches only for the TMAX values. 
-       #df = pd.read_csv(stDATAPATH+'ghcnd_station_master_ts_tmax.csv')[['ID','Name','Latitude','Longitude']].drop_duplicates()
-       df = pd.read_csv(self.yaml['STATIONMETA'],
-                        dtype={'Firstyear': np.int64,'Lastyear': np.int64})[['ID','Name','Latitude','Longitude','Firstyear','Lastyear']].drop_duplicates()
+       df1 = pd.read_csv(self.yaml['STATIONMETA'],
+                        dtype={'Firstyear': np.int64,'Lastyear': np.int64})[['ID','Name','Latitude','Longitude','Firstyear','Lastyear']]
        
        #These lines strip out stations where there is no recent data (from within the last year), 
        recentyear=date.today().year-1
-       df = df[df['Lastyear']>=recentyear] 
+       df = df1[df1['Lastyear']>=recentyear] 
        #and then strips out stations for which data is only very very recent. 
        baseyear=self.yaml['BASEYEAR']
        df = df[df['Firstyear']<=baseyear] 
@@ -98,18 +98,18 @@ class LoadStation :
        df=df[df['Longitude']<pt.x+bar]
        df=df[df['Latitude']>pt.y-bar]
        df=df[df['Latitude']<pt.y+bar]
-       
+       """
        #If the resulting trimmed dataframe is too small, you could introdcue errors
        #in the search. So, if the numebr is lses than a given value, 
        #then it reloads and expands the search.
        if len(df) < self.numstats*4:
-           df = pd.read_csv(self.yaml['STATIONMETA'])[['ID','Name','Latitude','Longitude']].drop_duplicates()
+           #df = pd.read_csv(self.yaml['STATIONMETA'])[['ID','Name','Latitude','Longitude']].drop_duplicates()
            bar1=10
            df=df[df['Longitude']>pt.x-bar1]
            df=df[df['Longitude']<pt.x+bar1]
            df=df[df['Latitude']>pt.y-bar1]
            df=df[df['Latitude']<pt.y+bar1]
-       
+       """
         #Prints th enumber of stations being searched.
        if self.display: 
            print("Searching closest station among "
@@ -338,24 +338,81 @@ class StationAnalyzer :
         
     #This creates a table (pd dataframe) of the key metrics of interest
     def key_metrics(self):
+        #Finds some data on the entire record.
+        alltime_firstyear=self.station_data_tmax['Year'].min()
+        alltime_endyear=self.station_data_tmax['Year'].max()
         
+        
+        #This first does the calculations, finding TMID avreage, TMAx, and TMIn,
+        #of the entire record.
         whole_tmid_mean=np.nanmean(self.station_data_tmid.iloc[:,-31:])
-        whole_tmax=np.nanmax(self.station_data_tmax.iloc[:,-31:])
-        whole_tmin=np.nanmin(self.station_data_tmin.iloc[:,-31:])
+        whole_tmax=float(np.nanmax(self.station_data_tmax.iloc[:,-31:]))
+        whole_tmin=float(np.nanmin(self.station_data_tmin.iloc[:,-31:]))
         
-        #This finds the index location of the max temperature.
+        #This finds the index location of the max temperature
+        
         maxloc=np.where(self.station_data_tmax.iloc[:,-31:]==whole_tmax)
-        maxyear=  int( self.station_data_tmax.iloc[int(maxloc[0]),1]     )
-        maxmonth  =  int( self.station_data_tmax.iloc[int(maxloc[0]),2]  )
-        maxday  =   self.station_data_tmax.columns[int(maxloc[1])]  
-        maxdate=str(maxyear)+'-'+str(maxmonth)+"-"+str(maxday[-2:])
+        
+        maxdate = []
+        #If there is onnoly one maximum temperature, it must be handled slightly idfferently
+        if np.shape(maxloc)[1]==1: 
+            maxyear=  int( self.station_data_tmax.iloc[int(maxloc[0][0]),1]     )
+            maxmonth=  int( self.station_data_tmax.iloc[int(maxloc[0][0]),2]     )
+            maxday  =   self.station_data_tmax.columns[int(maxloc[1][0])+4]  
+            maxdate.append(str(str(maxyear)+'-'+str(maxmonth)+"-"+str(maxday[3:])))
+        #If max loc has more than one entry, this means more than one maximum temperate was detected.
+        #You then need to loop to create a list of all dates. 
 
+        if np.shape(maxloc)[1]>1:
+            for kk in range(0,len(maxloc)):
+                maxyear=  int( self.station_data_tmax.iloc[int(maxloc[0][kk]),1]     )
+                maxmonth  =  int( self.station_data_tmax.iloc[int(maxloc[0][kk]),2]  )
+                maxday  =   self.station_data_tmax.columns[int(maxloc[1][kk])+4]  
+                maxdate.append(str(str(maxyear)+'-'+str(maxmonth)+"-"+str(maxday[3:])))
+         #This finds the index location of the min temperature
+         
+        minloc=np.where(self.station_data_tmin.iloc[:,-31:]==whole_tmin)
+         
+        mindate = []
+         #If there is onnoly one maximum temperature, it must be handled slightly idfferently
+        if np.shape(minloc)[1]==1: 
+            minyear=  int( self.station_data_tmin.iloc[int(minloc[0][0]),1]     )
+            minmonth=  int( self.station_data_tmin.iloc[int(minloc[0][0]),2]     )
+            minday  =   self.station_data_tmin.columns[int(minloc[1][0])+4]  
+            mindate.append(str(str(minyear)+'-'+str(minmonth)+"-"+str(minday[3:])))
+        #If min loc has more than one entry, this means more than one minimum temperate was detected.
+        #You then need to loop to create a list of all dates. 
+
+        if np.shape(minloc)[1]>1:
+            for kk in range(0,len(minloc)):
+                minyear=  int( self.station_data_tmin.iloc[int(minloc[0][kk]),1]     )
+                minmonth  =  int( self.station_data_tmin.iloc[int(minloc[0][kk]),2]  )
+                minday  =   self.station_data_tmin.columns[int(minloc[1][kk])+4]  
+                mindate.append(str(str(minyear)+'-'+str(minmonth)+"-"+str(minday[3:])))
+
+#This creates a dataframe of data points.
         returner = pd.DataFrame(
-            {"TMID_av_F_entire_record":[whole_tmid_mean],
-             "TMAX_F_entire_record":[whole_tmax],
-             "TMAX_date":[maxdate],
-             "TMIN_F_entire_record":[whole_tmin]
+            {
+             "first_year_in_record":[alltime_firstyear],
+             "last_year_in_record":[alltime_endyear],
+                "TMID_av_F_alltime":[whole_tmid_mean],
+              "TMAX_F_alltime":[whole_tmax],
+             "TMAX_alltime_date":[maxdate],
+             "TMIN_F_alltime":[whole_tmin],
+             "TMIN_alltime_date":[mindate],
              
              }
             )
-        return returner           
+        return returner   
+    #end key_metrics
+     #This creates several charts of interest.
+    def key_charts(self):
+        #This flattens TMID, so it can go into a chart more readily.
+        tmid_flat=np.array(self.station_data_tmid.iloc[:,-31:]).flatten()
+        plt.hist(tmid_flat,bins=200,density=True)
+        plt.title('Freqency Histogram of TMID')
+        plt.xlabel('Fraction of Total at this TMID')
+        plt.ylabel('Temperature, F (TMID)')
+        plt.show()
+         
+                
