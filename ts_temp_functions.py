@@ -324,9 +324,59 @@ class StationAnalyzer :
     def __init__(self,stationdata,refperiod=[np.datetime64('2020-01-31'),np.datetime64('2020-12-31')],autorun=True):
         
         #separates out the different variables ofinterest.
+        #At some point, you should convert all of these into np.asarray'
+        #for expedited procsesing. 
         self.station_data_tmid=stationdata[stationdata['Element']=='TMID']
         self.station_data_tmax=stationdata[stationdata['Element']=='TMAX']
         self.station_data_tmin=stationdata[stationdata['Element']=='TMIN']
+        
+        #This creates numpy arrays of the above dataframes. 
+        self.tmid_np=np.asarray(self.station_data_tmid.drop(['Station_ID','Element'],axis=1))
+        
+        self.all_data=np.asarray(stationdata.drop(['Station_ID'],axis=1))
+        #this creates Monthly Average avlues, used by sveral functions.
+        #This takes mean values of every month.
+        self.monthlymeans=np.nanmean(self.tmid_np[:,2:500],axis=1)
+        #This then combines them into an array, so the yer and month values are kept. 
+        self.monthlymeans=np.array([self.tmid_np[:,0],self.tmid_np[:,1],self.monthlymeans])
+        #nd finally, tarnsposes them. Each row is the average value for the month. 
+        self.monthlymeans=np.transpose(self.monthlymeans)
+        
+        #TURN 31 COLUMN ENTRIES, ONE FOR EVERY DAY OF YEAR, TO ONE LONG MATRIX
+        #You may consider moving this into the station_data object. 
+        #This allows you to number each day of the year.
+        #Making it much easier to serach by days. 
+        inter=[]
+        #Loop over entire length of the dataset. 
+        for k in np.arange(0,len(self.tmid_np)):
+            #Pull out the year, month, and then monthdata, for every row.
+            year=int(self.tmid_np[k,0])
+            month=int(self.tmid_np[k,1])
+            monthdata=np.transpose(self.tmid_np[k,2:])
+            #Then loop over each month, creating a enw row for every single element. 
+            for i in np.arange(1,31):
+                doy = i + (month-1)*31
+                inter.append([year,month,i,doy,monthdata[i-1]])
+                
+        self.tmid_array=np.asarray(inter)
+        
+        #This then creates the yearly averages.
+        #First, find the beginning and end years.
+        startyear=self.station_data_tmid['Year'].min()
+        endyear=self.station_data_tmid['Year'].max()
+        out=[]
+        #Then, loop over all years and take the average. 
+        for k in np.arange(startyear,endyear+1):
+            yr=k
+            #select just the years column. 
+            yearscol=self.monthlymeans[:,0]
+            #The average is only included if 12 months of data are available. 
+            #If not, it would bias the average. 
+            if np.shape(np.where(yearscol==yr))[1]==12:
+                yearmean=np.nanmean(self.monthlymeans[np.where(yearscol==yr)][:,2])
+                out.append([yr,yearmean])
+        out=np.asarray(out)
+        self.yearlymeans=out
         
         self.refstart=refperiod[0]
         self.refend=refperiod[1]
@@ -345,14 +395,14 @@ class StationAnalyzer :
         
         #This first does the calculations, finding TMID avreage, TMAx, and TMIn,
         #of the entire record.
-        whole_tmid_mean=np.nanmean(self.station_data_tmid.iloc[:,-31:])
+        whole_tmid_mean=np.nanmean(self.tmid_array[:,4])
         whole_tmax=float(np.nanmax(self.station_data_tmax.iloc[:,-31:]))
         whole_tmin=float(np.nanmin(self.station_data_tmin.iloc[:,-31:]))
         
         #This finds the index location of the max temperature
         
         maxloc=np.where(self.station_data_tmax.iloc[:,-31:]==whole_tmax)
-        
+        self.testmaxloc = maxloc
         maxdate = []
         #If there is onnoly one maximum temperature, it must be handled slightly idfferently
         if np.shape(maxloc)[1]==1: 
@@ -409,10 +459,18 @@ class StationAnalyzer :
     def key_charts(self):
         #This flattens TMID, so it can go into a chart more readily.
         tmid_flat=np.array(self.station_data_tmid.iloc[:,-31:]).flatten()
-        plt.hist(tmid_flat,bins=200,density=True)
+        plt.hist(tmid_flat,bins=30,density=True)
         plt.title('Freqency Histogram of TMID')
         plt.xlabel('Fraction of Total at this TMID')
         plt.ylabel('Temperature, F (TMID)')
         plt.show()
+        
+        plt.plot(self.yearlymeans[:,0],self.yearlymeans[:,1])
+        plt.title('Annual Average of Monthly TMID')
+        plt.xlabel('Year')
+        plt.ylabel('Annual Average Temperature, F (TMID)')
+        plt.show()
+        
+        
          
                 

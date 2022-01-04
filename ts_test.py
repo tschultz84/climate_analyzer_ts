@@ -45,7 +45,7 @@ dvtdata=LoadStation([32.659167, -116.099167],10,True,True) #Loading in Desert Vi
 #%%
 dvtcalc=StationAnalyzer(dvtdata.station_data_clean)
 print(dvtcalc.kpi)
-#testdvt.key_charts()
+dvtcalc.key_charts()
 
 #%%
 
