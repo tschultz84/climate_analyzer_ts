@@ -29,8 +29,9 @@ bzdata=LoadStation([45.647256643331126,-111.04060494981753],10,True,True) #Loadi
 bzcalc=StationAnalyzer(bzdata.station_data_clean)
 bzalldata=bzdata.station_data_clean
 print(bzcalc.kpi)
-bzcalc.key_charts()
-print(bzcalc.all_data_long)
+#bzcalc.key_charts()
+#print(bzcalc.tmin_array[15000:15035])
+#print(bzalldata[(bzalldata['Element']=="TMIN")&(bzalldata['Year']==1934)&(bzalldata['Month']==12)])
 #%%
 testbz=bzcalc.monthlymeans
 #testbz['Date']=str(int(testbz['Year']))+str(int(testbz['Month']))
@@ -53,7 +54,7 @@ obdata=LoadStation([37.755663644,-122.506497974],10,True,True) #Loading in Ocean
 obcalc=StationAnalyzer(obdata.station_data_clean)
 
 print(obcalc.kpi)
-obcalc.key_charts()
+#obcalc.key_charts()
 
 #%%
 test12=LoadStation([32.741947,-117.239571],10,True,True) #Loading in Ocean Beach, San Diego coordinates
@@ -63,6 +64,7 @@ dvtdata=LoadStation([32.659167, -116.099167],10,True,True) #Loading in Desert Vi
 dvtcalc=StationAnalyzer(dvtdata.station_data_clean)
 print(dvtcalc.kpi)
 dvtcalc.key_charts()
+#print(dvtcalc.maxdate)
 
 #
 

@@ -346,35 +346,48 @@ class StationAnalyzer :
         #You may consider moving this into the station_data object. 
         #This allows you to number each day of the year.
         #Making it much easier to serach by days. 
-        inter1=[]
+        #This step is a good candidate to move into the LoadStation object. 
+
+        inter1=np.empty((len(self.all_data)*31,6))
+        tot=0
+    
         #Loop over entire length of the dataset. 
         for k in np.arange(0,len(self.all_data)):
             #Pull out the year, month, and then monthdata, for every row.
-            year=int(self.all_data[k,0])
-            month=int(self.all_data[k,1])
+            year=self.all_data[k,0]
+            month=self.all_data[k,1]
             monthdata=np.transpose(self.all_data[k,3:])
+            #Turning the elemnt value into a number, which is easier to work with
+            #in numpy (and faster)
+            #The integer values are arbitrary. 
             ele = self.all_data[k,2]
+            if(ele == "TMIN"):
+                eler=0
+            if(ele == "TMAX"):
+                eler=1
+            if(ele == "TMID"):
+                eler=2
+
             #Then loop over each month, creating a enw row for every single element. 
-            for i in np.arange(1,31):
+            for i in np.arange(1,32):
+                #Assign the Day of Year, which goes to more than 365 (31 * 12)
                 doy = i + (month-1)*31
-                inter1.append(np.asarray([year,month,i,doy,ele,monthdata[i-1]]))
                 
-        self.all_data_long=np.asarray(inter1)
+                #Then assigning each column value. 
+                inter1[tot,0]=year
+                inter1[tot,1]=month
+                inter1[tot,2]=i
+                inter1[tot,3]=doy
+                inter1[tot,5]=eler
+                inter1[tot,4]=monthdata[i-1]  
+                tot=tot+1
         
-        #The one to make a long TMID array works. But all_data_long currently
-        #creates a long array of strings. 
-        inter=[]
-        for k in np.arange(0,len(self.tmid_np)):
-            #Pull out the year, month, and then monthdata, for every row.
-            year=int(self.tmid_np[k,0])
-            month=int(self.tmid_np[k,1])
-            monthdata=np.transpose(self.tmid_np[k,2:])
-            #Then loop over each month, creating a enw row for every single element. 
-            for i in np.arange(1,31):
-                doy = i + (month-1)*31
-                inter.append([year,month,i,doy,monthdata[i-1]])
-                
-        self.tmid_array=np.asarray(inter)
+        #Creating the assigned value containing every single element. 
+        self.all_data_long=inter1
+        #Then assining off TMID, TMIN, and TMAX. 
+        self.tmid_array = self.all_data_long[np.where(self.all_data_long[:,5]==2)][:,:5]
+        self.tmin_array = self.all_data_long[np.where(self.all_data_long[:,5]==0)][:,:5]
+        self.tmax_array = self.all_data_long[np.where(self.all_data_long[:,5]==1)][:,:5]
         
         #This then creates the yearly averages.
         #First, find the beginning and end years.
@@ -412,50 +425,37 @@ class StationAnalyzer :
         #This first does the calculations, finding TMID avreage, TMAx, and TMIn,
         #of the entire record.
         whole_tmid_mean=np.nanmean(self.tmid_array[:,4])
-        whole_tmax=float(np.nanmax(self.station_data_tmax.iloc[:,-31:]))
-        whole_tmin=float(np.nanmin(self.station_data_tmin.iloc[:,-31:]))
+        whole_tmax=np.nanmax(self.tmax_array[:,4])
+        whole_tmin=np.nanmin(self.tmin_array[:,4])
         
         #This finds the index location of the max temperature
+        #First, by finding its index locations. 
+        maxloc=np.where(self.tmax_array[:,4]==whole_tmax)
+        #Then, creating a list (since there may be more than one) of days of maxium temp. 
+        maxyears=   self.tmax_array[maxloc][:,0]
+        maxmonths=   self.tmax_array[maxloc][:,1]
+        maxdays=   self.tmax_array[maxloc][:,2]
         
-        maxloc=np.where(self.station_data_tmax.iloc[:,-31:]==whole_tmax)
-        self.testmaxloc = maxloc
-        maxdate = []
-        #If there is onnoly one maximum temperature, it must be handled slightly idfferently
-        if np.shape(maxloc)[1]==1: 
-            maxyear=  int( self.station_data_tmax.iloc[int(maxloc[0][0]),1]     )
-            maxmonth=  int( self.station_data_tmax.iloc[int(maxloc[0][0]),2]     )
-            maxday  =   self.station_data_tmax.columns[int(maxloc[1][0])+4]  
-            maxdate.append(str(str(maxyear)+'-'+str(maxmonth)+"-"+str(maxday[3:])))
-        #If max loc has more than one entry, this means more than one maximum temperate was detected.
-        #You then need to loop to create a list of all dates. 
-
-        if np.shape(maxloc)[1]>1:
-            for kk in range(0,len(maxloc)):
-                maxyear=  int( self.station_data_tmax.iloc[int(maxloc[0][kk]),1]     )
-                maxmonth  =  int( self.station_data_tmax.iloc[int(maxloc[0][kk]),2]  )
-                maxday  =   self.station_data_tmax.columns[int(maxloc[1][kk])+4]  
-                maxdate.append(str(str(maxyear)+'-'+str(maxmonth)+"-"+str(maxday[3:])))
-         #This finds the index location of the min temperature
-         
-        minloc=np.where(self.station_data_tmin.iloc[:,-31:]==whole_tmin)
-         
-        mindate = []
-         #If there is onnoly one maximum temperature, it must be handled slightly idfferently
-        if np.shape(minloc)[1]==1: 
-            minyear=  int( self.station_data_tmin.iloc[int(minloc[0][0]),1]     )
-            minmonth=  int( self.station_data_tmin.iloc[int(minloc[0][0]),2]     )
-            minday  =   self.station_data_tmin.columns[int(minloc[1][0])+4]  
-            mindate.append(str(str(minyear)+'-'+str(minmonth)+"-"+str(minday[3:])))
-        #If min loc has more than one entry, this means more than one minimum temperate was detected.
-        #You then need to loop to create a list of all dates. 
-
-        if np.shape(minloc)[1]>1:
-            for kk in range(0,len(minloc)):
-                minyear=  int( self.station_data_tmin.iloc[int(minloc[0][kk]),1]     )
-                minmonth  =  int( self.station_data_tmin.iloc[int(minloc[0][kk]),2]  )
-                minday  =   self.station_data_tmin.columns[int(minloc[1][kk])+4]  
-                mindate.append(str(str(minyear)+'-'+str(minmonth)+"-"+str(minday[3:])))
-
+        #THen creating a list of strings including every day that was at maximum. 
+        maxdate=[]
+        for i in np.arange(0,len(maxyears)):
+            maxdatestr=str(str(int(maxyears[i]))+'-'+str(int(maxmonths[i]))+"-"+str(int(maxdays[i])))
+            maxdate.append(maxdatestr)
+            
+        #This finds the index location of the min temperature
+        #First, by finding its index locations. 
+        minloc=np.where(self.tmin_array[:,4]==whole_tmin)
+        #Then, creating a list (since there may be more than one) of days of maxium temp. 
+        minyears=   self.tmin_array[minloc][:,0]
+        minmonths=   self.tmin_array[minloc][:,1]
+        mindays=   self.tmin_array[minloc][:,2]
+        
+        #THen creating a list of strings including every day that was at maximum. 
+        mindate=[]
+        for i in np.arange(0,len(minyears)):
+            mindatestr=str(str(int(minyears[i]))+'-'+str(int(minmonths[i]))+"-"+str(int(mindays[i])))
+            mindate.append(mindatestr)
+     
 #This creates a dataframe of data points.
         returner = pd.DataFrame(
             {
@@ -469,6 +469,7 @@ class StationAnalyzer :
              
              }
             )
+        
         return returner   
     #end key_metrics
      #This creates several charts of interest.
