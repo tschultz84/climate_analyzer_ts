@@ -346,8 +346,24 @@ class StationAnalyzer :
         #You may consider moving this into the station_data object. 
         #This allows you to number each day of the year.
         #Making it much easier to serach by days. 
-        inter=[]
+        inter1=[]
         #Loop over entire length of the dataset. 
+        for k in np.arange(0,len(self.all_data)):
+            #Pull out the year, month, and then monthdata, for every row.
+            year=int(self.all_data[k,0])
+            month=int(self.all_data[k,1])
+            monthdata=np.transpose(self.all_data[k,3:])
+            ele = self.all_data[k,2]
+            #Then loop over each month, creating a enw row for every single element. 
+            for i in np.arange(1,31):
+                doy = i + (month-1)*31
+                inter1.append(np.asarray([year,month,i,doy,ele,monthdata[i-1]]))
+                
+        self.all_data_long=np.asarray(inter1)
+        
+        #The one to make a long TMID array works. But all_data_long currently
+        #creates a long array of strings. 
+        inter=[]
         for k in np.arange(0,len(self.tmid_np)):
             #Pull out the year, month, and then monthdata, for every row.
             year=int(self.tmid_np[k,0])

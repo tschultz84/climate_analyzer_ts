@@ -27,8 +27,25 @@ bzdata=LoadStation([45.647256643331126,-111.04060494981753],10,True,True) #Loadi
 
 #%%
 bzcalc=StationAnalyzer(bzdata.station_data_clean)
+bzalldata=bzdata.station_data_clean
 print(bzcalc.kpi)
 bzcalc.key_charts()
+print(bzcalc.all_data_long)
+#%%
+testbz=bzcalc.monthlymeans
+#testbz['Date']=str(int(testbz['Year']))+str(int(testbz['Month']))
+#%%
+out=[]
+for k in np.arange(1892,2021+1):
+    yr=k
+    testbzyears=testbz[:,0]
+    if np.shape(np.where(testbzyears==yr))[1]==12:
+        
+        yearmean=np.nanmean(testbz[np.where(testbzyears==yr)][:,2])
+        out.append([yr,yearmean])
+out=np.asarray(out)
+
+
 
 #%%
 obdata=LoadStation([37.755663644,-122.506497974],10,True,True) #Loading in Ocean Beach, SF coordinates
@@ -47,7 +64,7 @@ dvtcalc=StationAnalyzer(dvtdata.station_data_clean)
 print(dvtcalc.kpi)
 dvtcalc.key_charts()
 
-#%%
+#
 
 #%%
 
