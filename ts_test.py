@@ -29,7 +29,8 @@ bzdata=LoadStation([45.647256643331126,-111.04060494981753],10,True,True) #Loadi
 bzcalc=StationAnalyzer(bzdata.station_data_clean)
 bzalldata=bzdata.station_data_clean
 print(bzcalc.kpi)
-#bzcalc.key_charts()
+bzcalc.key_charts()
+
 #print(bzcalc.tmin_array[15000:15035])
 #print(bzalldata[(bzalldata['Element']=="TMIN")&(bzalldata['Year']==1934)&(bzalldata['Month']==12)])
 #%%
@@ -50,11 +51,14 @@ out=np.asarray(out)
 
 #%%
 obdata=LoadStation([37.755663644,-122.506497974],10,True,True) #Loading in Ocean Beach, SF coordinates
+#obdata.calculate_tmid_new(obdata.all_data_np)
+
+
 #%%
 obcalc=StationAnalyzer(obdata.station_data_clean)
 
 print(obcalc.kpi)
-#obcalc.key_charts()
+obcalc.key_charts()
 
 #%%
 test12=LoadStation([32.741947,-117.239571],10,True,True) #Loading in Ocean Beach, San Diego coordinates

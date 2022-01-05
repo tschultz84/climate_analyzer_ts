@@ -35,6 +35,12 @@
             #of the reference point. 
     SEARCH_RADIUS : 1
 
+#these index valuesare used to hardcode smoe elements into Numpy format
+#Whiel getting rid of strings, making the whole process faster. 
+    TMIN_INDEX : 0
+    TMAX_INDEX : 1
+    TMID_INDEX : 2
+
 #=============
 #REQUIRED SPECIFICTIONS TO LOAD .DLY FILES
 

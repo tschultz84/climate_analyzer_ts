@@ -98,18 +98,7 @@ class LoadStation :
        df=df[df['Longitude']<pt.x+bar]
        df=df[df['Latitude']>pt.y-bar]
        df=df[df['Latitude']<pt.y+bar]
-       """
-       #If the resulting trimmed dataframe is too small, you could introdcue errors
-       #in the search. So, if the numebr is lses than a given value, 
-       #then it reloads and expands the search.
-       if len(df) < self.numstats*4:
-           #df = pd.read_csv(self.yaml['STATIONMETA'])[['ID','Name','Latitude','Longitude']].drop_duplicates()
-           bar1=10
-           df=df[df['Longitude']>pt.x-bar1]
-           df=df[df['Longitude']<pt.x+bar1]
-           df=df[df['Latitude']>pt.y-bar1]
-           df=df[df['Latitude']<pt.y+bar1]
-       """
+
         #Prints th enumber of stations being searched.
        if self.display: 
            print("Searching closest station among "
@@ -265,108 +254,38 @@ class LoadStation :
         #Convert from Celsius to Farnehit
         returner.iloc[:,-31:] = (returner.iloc[:,-31:]*9/5)+32
         
-        return returner
-    
-    def calculate_tmid(self,stationd):
-        if self.display==True: startTime = time.time()
-        
-        #Finds the earliest and latest years.
-        yrmin = stationd['Year'].min()
-        yrmax = stationd['Year'].max()
-
-
-        stationd=stationd.sort_values(by=['Year','Month'])
-        statID=stationd.iloc[0,0]
-        tmiddata=pd.DataFrame()
-
-        #The ' k' loop is over all elements.
-        for k in np.arange(0,len(stationd)-1):
-       # for k in np.arange(0,10):
-            #This initializes the temporary dataframes. 
-            calc=pd.DataFrame()
-            calcint=pd.DataFrame()
-            #This extracts the data for the right year and months.
-            calcmax = stationd.iloc[k]
-            calcmin = stationd.iloc[k+1]
-            
-            if calcmax['Element'] == "TMAX" and calcmin['Element'] == "TMIN":
-                if calcmax['Year'] == calcmin['Year'] and calcmax['Month'] == calcmin['Month']:
-                      
-                    #This combines TMAX and TMIN values, such that the average can be taken. 
-                    calcint1=pd.concat([calcmax,calcmin],axis=1)
-                   # returner=calcint1
-                    #This calcualtes the TMID values, which are the average of 
-                    #TMAX and TMIN.
-                    #It is importnat that skipna=FAlse, which ensures that
-                    #if either tMAX or TMIN is NaN, then so is the result for TMID.
-                    calcint = calcint1.iloc[4:].sum(axis=1,skipna=False)/2
-                    #print(calcint)
-                    #This inserts back in the missing collumns. 
-                    calcint['Year']=calcmax['Year']
-                    calcint['Month']=calcmax['Month']
-                    calcint['Element']='TMID'
-                    calcint['Station_ID']=statID
-                    #And this appends the new row to the returned dataframe. 
-                    tmiddata=tmiddata.append(calcint,ignore_index=True)
-        returner=stationd.append(tmiddata)
-
-        if self.display==True: 
-            executionTime = (time.time() - startTime)
-            print("Time taken to create TMID by going through rows " + str(executionTime))
-        return returner
-        
-#All analysis fucntions for a station are done in this object.
-#The input is stationdata, which shoudl be self.station_data_claned from the StationLoad object
-#the refperiod is a 2 element list of start and end, reference period of analysis
-#autorun simply immediately runs the KPI key_metrics function if True 
-
-class StationAnalyzer :
-    def __init__(self,stationdata,refperiod=[np.datetime64('2020-01-31'),np.datetime64('2020-12-31')],autorun=True):
-        
-        #separates out the different variables ofinterest.
-        #At some point, you should convert all of these into np.asarray'
-        #for expedited procsesing. 
-        self.station_data_tmid=stationdata[stationdata['Element']=='TMID']
-        self.station_data_tmax=stationdata[stationdata['Element']=='TMAX']
-        self.station_data_tmin=stationdata[stationdata['Element']=='TMIN']
-        
-        #This creates numpy arrays of the above dataframes. 
-        self.tmid_np=np.asarray(self.station_data_tmid.drop(['Station_ID','Element'],axis=1))
-        
-        self.all_data=np.asarray(stationdata.drop(['Station_ID'],axis=1))
-        #this creates Monthly Average avlues, used by sveral functions.
-        #This takes mean values of every month.
-        self.monthlymeans=np.nanmean(self.tmid_np[:,2:500],axis=1)
-        #This then combines them into an array, so the yer and month values are kept. 
-        self.monthlymeans=np.array([self.tmid_np[:,0],self.tmid_np[:,1],self.monthlymeans])
-        #nd finally, tarnsposes them. Each row is the average value for the month. 
-        self.monthlymeans=np.transpose(self.monthlymeans)
+        #Sort values. 
+        returner=returner.sort_values(by=['Year','Month'])
         
         #TURN 31 COLUMN ENTRIES, ONE FOR EVERY DAY OF YEAR, TO ONE LONG MATRIX
         #You may consider moving this into the station_data object. 
         #This allows you to number each day of the year.
         #Making it much easier to serach by days. 
-        #This step is a good candidate to move into the LoadStation object. 
-
-        inter1=np.empty((len(self.all_data)*31,6))
+        all_data=np.asarray(returner.drop(['Station_ID'],axis=1))
+        self.all_data_1=all_data
+        #return returner
+        
+        inter1=np.empty((len(all_data)*31,6))
+        #inter1=np.asarray(inter1,dtype=dtyper)
         tot=0
     
         #Loop over entire length of the dataset. 
-        for k in np.arange(0,len(self.all_data)):
+        for k in np.arange(0,len(all_data)):
             #Pull out the year, month, and then monthdata, for every row.
-            year=self.all_data[k,0]
-            month=self.all_data[k,1]
-            monthdata=np.transpose(self.all_data[k,3:])
+            year=all_data[k,0]
+            month=all_data[k,1]
+            monthdata=np.transpose(all_data[k,3:])
             #Turning the elemnt value into a number, which is easier to work with
             #in numpy (and faster)
             #The integer values are arbitrary. 
-            ele = self.all_data[k,2]
+            ele = all_data[k,2]
+            eler=-1
             if(ele == "TMIN"):
-                eler=0
+                eler=self.yaml['TMIN_INDEX']
             if(ele == "TMAX"):
-                eler=1
-            if(ele == "TMID"):
-                eler=2
+                eler=self.yaml['TMAX_INDEX']
+           # if(ele == "TMID"):
+           #     eler=2
 
             #Then loop over each month, creating a enw row for every single element. 
             for i in np.arange(1,32):
@@ -383,30 +302,71 @@ class StationAnalyzer :
                 tot=tot+1
         
         #Creating the assigned value containing every single element. 
-        self.all_data_long=inter1
+        self.all_data_np=inter1
+        return inter1
+    
+    #Calculates TMID. 
+    #Station d must be in the format of self.all_data_np. 
+    def calculate_tmid(self,stationd):
+        if self.display==True: startTime = time.time()
+        
+        #Breaks apart the TMAX and TMIN values. 
+        self.tmaxval=stationd[np.where(stationd[:,5]==self.yaml["TMAX_INDEX"])]
+        self.tminval=stationd[np.where(stationd[:,5]==self.yaml["TMIN_INDEX"])]
+
+    #Finds the maximum length array -- because the two arrays are not the same. 
+        
+        maxct=np.min([len(self.tmaxval),len(self.tminval)])
+        #Finds matching indexes. 
+        self.matching = np.where((self.tmaxval[:maxct,0]==self.tminval[:maxct,0])&(self.tmaxval[:maxct,2]==self.tminval[:maxct,2]))[0]
+        
+        #Creates a big array of matching indices. 
+        tmidarr=np.array([self.tmaxval[self.matching,4],self.tminval[self.matching,4]])  
+        
+        #Then evaluates means, and puts them together into one matrix. 
+        tmidmean=np.nanmean(tmidarr,axis=0)
+       #YOU HAVE TO CORRECT THE DATES OUTPUT, IT IS'T YET WORKING. 
+        self.dates=self.tmaxval[self.matching,0:4]
+        returner = np.insert(self.dates,4,tmidmean,axis=1)
+        returner=np.insert(returner,5,self.yaml['TMID_INDEX'],axis=1) 
+        
+        #Finally, combines the matrices for a return. 
+        returner=np.append(returner,self.tmaxval,axis=0)
+        returner=np.append(returner,self.tminval,axis=0)
+
+
+        if self.display==True: 
+            executionTime = (time.time() - startTime)
+            print("Time taken to create TMID using NUMPY " + str(executionTime))
+        self.checkit=returner
+        return returner
+    
+#All analysis fucntions for a station are done in this object.
+#The input is stationdata, which shoudl be self.station_data_claned from the StationLoad object
+#the refperiod is a 2 element list of start and end, reference period of analysis
+#autorun simply immediately runs the KPI key_metrics function if True 
+
+class StationAnalyzer :
+    def __init__(self,stationdata,refperiod=[np.datetime64('2020-01-31'),np.datetime64('2020-12-31')],autorun=True):
+        
+        #This YAML file contains a great deal of static information, 
+        #such as directory information. 
+        yaml_file = open("load_stats_static.yaml")
+        self.yaml = yaml.load(yaml_file, Loader=yaml.FullLoader)
+    
+        #Creating the assigned value containing every single element. 
+        self.all_data_long=stationdata
         #Then assining off TMID, TMIN, and TMAX. 
-        self.tmid_array = self.all_data_long[np.where(self.all_data_long[:,5]==2)][:,:5]
-        self.tmin_array = self.all_data_long[np.where(self.all_data_long[:,5]==0)][:,:5]
-        self.tmax_array = self.all_data_long[np.where(self.all_data_long[:,5]==1)][:,:5]
+        self.tmid_array = self.all_data_long[np.where(self.all_data_long[:,5]==self.yaml['TMID_INDEX'])][:,:5]
+        self.tmin_array = self.all_data_long[np.where(self.all_data_long[:,5]==self.yaml['TMIN_INDEX'])][:,:5]
+        self.tmax_array = self.all_data_long[np.where(self.all_data_long[:,5]==self.yaml['TMAX_INDEX'])][:,:5]
         
         #This then creates the yearly averages.
         #First, find the beginning and end years.
-        startyear=self.station_data_tmid['Year'].min()
-        endyear=self.station_data_tmid['Year'].max()
-        out=[]
-        #Then, loop over all years and take the average. 
-        for k in np.arange(startyear,endyear+1):
-            yr=k
-            #select just the years column. 
-            yearscol=self.monthlymeans[:,0]
-            #The average is only included if 12 months of data are available. 
-            #If not, it would bias the average. 
-            if np.shape(np.where(yearscol==yr))[1]==12:
-                yearmean=np.nanmean(self.monthlymeans[np.where(yearscol==yr)][:,2])
-                out.append([yr,yearmean])
-        out=np.asarray(out)
-        self.yearlymeans=out
+        self.alltime_startyear=np.nanmin(self.tmax_array[:,0])
+        self.alltime_endyear=np.nanmax(self.tmax_array[:,0])
         
+              
         self.refstart=refperiod[0]
         self.refend=refperiod[1]
         
@@ -416,12 +376,7 @@ class StationAnalyzer :
             #print(self.kpi)
         
     #This creates a table (pd dataframe) of the key metrics of interest
-    def key_metrics(self):
-        #Finds some data on the entire record.
-        alltime_firstyear=self.station_data_tmax['Year'].min()
-        alltime_endyear=self.station_data_tmax['Year'].max()
-        
-        
+    def key_metrics(self):       
         #This first does the calculations, finding TMID avreage, TMAx, and TMIn,
         #of the entire record.
         whole_tmid_mean=np.nanmean(self.tmid_array[:,4])
@@ -456,11 +411,11 @@ class StationAnalyzer :
             mindatestr=str(str(int(minyears[i]))+'-'+str(int(minmonths[i]))+"-"+str(int(mindays[i])))
             mindate.append(mindatestr)
      
-#This creates a dataframe of data points.
+        #This creates a dataframe of data points.
         returner = pd.DataFrame(
             {
-             "first_year_in_record":[alltime_firstyear],
-             "last_year_in_record":[alltime_endyear],
+             "first_year_in_record":[self.alltime_startyear],
+             "last_year_in_record":[self.alltime_endyear],
                 "TMID_av_F_alltime":[whole_tmid_mean],
               "TMAX_F_alltime":[whole_tmax],
              "TMAX_alltime_date":[maxdate],
@@ -474,20 +429,62 @@ class StationAnalyzer :
     #end key_metrics
      #This creates several charts of interest.
     def key_charts(self):
-        #This flattens TMID, so it can go into a chart more readily.
-        tmid_flat=np.array(self.station_data_tmid.iloc[:,-31:]).flatten()
-        plt.hist(tmid_flat,bins=30,density=True)
+  
+        #Creates a histogram of daily TMID values. 
+        plt.hist(self.tmid_array[:,4],bins=30,density=True)
         plt.title('Freqency Histogram of TMID')
         plt.xlabel('Fraction of Total at this TMID')
         plt.ylabel('Temperature, F (TMID)')
         plt.show()
         
-        plt.plot(self.yearlymeans[:,0],self.yearlymeans[:,1])
+        #This creates an array with mean of all months. 
+        yearsout=np.empty([0,2])
+        for year in np.arange(self.alltime_startyear,self.alltime_endyear+1):
+                 
+            #Select only the index values wehre the year is equal to year.
+            index=np.where(self.tmid_array[:,0]==year)
+            #Then, selects data for this year
+            #All columns are pulled, since we have to filter to ensure ther eare 
+            #12 months for every year evaluated. 
+            all_years_data=self.tmid_array[index]
+            
+            #The data is only written into the new numpy array, if
+            #the number of months for the year is 12.
+            #This is evaluate dby counting the number of unique days
+            #in each year, which must exceed 330. 
+            if len(all_years_data)>11*30:
+                #And evaluates their mean. 
+                all_years_means=np.nanmean(all_years_data[:,4])
+                row=np.array([year,all_years_means])
+                yearsout=np.append(yearsout,[row],axis=0)
+        yearsmean=yearsout
+        
+        
+        #Creates a plot over time of the annual average values. 
+        plt.plot(yearsmean[:,0],yearsmean[:,1])
         plt.title('Annual Average of Monthly TMID')
         plt.xlabel('Year')
         plt.ylabel('Annual Average Temperature, F (TMID)')
         plt.show()
         
-        
+        #This creates an array with mean of all months. 
+        monthout=np.empty([12,2])
+        for month in np.arange(1,13):
+            
+            #Select only the index values wehre the month is equal to month. 
+            index=np.where(self.tmid_array[:,1]==month)
+            #Then, selects values for this month
+            all_months_data=self.tmid_array[index,4]
+            #And evaluates their mean. 
+            all_months_means=np.nanmean(all_months_data)
+            monthout[month-1,0]=month
+            monthout[month-1,1]=all_months_means
+            
+        #Creates a plot over one year of the monthyl average TMID temperatures. 
+        plt.plot(monthout[:,0],monthout[:,1])
+        plt.title('Monthly Average of TMID')
+        plt.xlabel('Month')
+        plt.ylabel('Monthly Average Temperature, F (TMID)')
+        plt.show()
          
                 
