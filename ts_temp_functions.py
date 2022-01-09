@@ -55,7 +55,7 @@ class LoadStation :
             self.closest_stations = self.nearest_station()
             self.station_data=self.load_station(self.closest_stations.iloc[1,0])
             self.station_data_clean=self.StationDataCleaner()
-            self.station_data_clean=self.calculate_tmid(self.station_data_clean)
+      #      self.station_data_clean=self.calculate_tmid(self.station_data_clean)
     """    
     #This function as a default takes the LoadStation object's
     #reference point of interest and searches for the nearest point in our list of points,
@@ -213,7 +213,7 @@ class LoadStation :
         prelim.columns=shortnames
         #This generates the rows to skip.   
         #Currently you are keeping only TMAX and TMIN
-        tokeep=['TMAX','TMIN']
+        tokeep=['TMAX','TMIN','TAVG']
         skiprows1 = prelim[(~prelim['Element'].isin(tokeep))].index
         
         
@@ -264,6 +264,9 @@ class LoadStation :
         all_data=np.asarray(returner.drop(['Station_ID'],axis=1))
         self.all_data_1=all_data
         #return returner
+        #You need to drop all years without 12 months of data.
+        #That screws up your calculations
+        #and will also bias results. 
         
         inter1=np.empty((len(all_data)*31,6))
         #inter1=np.asarray(inter1,dtype=dtyper)
@@ -301,9 +304,10 @@ class LoadStation :
                 inter1[tot,4]=monthdata[i-1]  
                 tot=tot+1
         
-        #Creating the assigned value containing every single element. 
-        self.all_data_np=inter1
-        return inter1
+        #This then calculates TMEAN values. 
+        returner = self.calculate_tmid(inter1)
+        self.all_data_np=returner
+        return returner
     
     #Calculates TMID. 
     #Station d must be in the format of self.all_data_np. 
@@ -311,35 +315,60 @@ class LoadStation :
         if self.display==True: startTime = time.time()
         
         #Breaks apart the TMAX and TMIN values. 
-        self.tmaxval=stationd[np.where(stationd[:,5]==self.yaml["TMAX_INDEX"])]
-        self.tminval=stationd[np.where(stationd[:,5]==self.yaml["TMIN_INDEX"])]
+        tmax=stationd[np.where(stationd[:,5]==self.yaml["TMAX_INDEX"])]
+        tmin=stationd[np.where(stationd[:,5]==self.yaml["TMIN_INDEX"])]
 
-    #Finds the maximum length array -- because the two arrays are not the same. 
+        #THen loops over every entry, finds the mtaching dates int he other array,
+        #then, if they are teh same, adds it to the returned array.
         
-        maxct=np.min([len(self.tmaxval),len(self.tminval)])
-        #Finds matching indexes. 
-        self.matching = np.where((self.tmaxval[:maxct,0]==self.tminval[:maxct,0])&(self.tmaxval[:maxct,2]==self.tminval[:maxct,2]))[0]
+        outer= []
+        for i in np.arange(0,len(tmax)):
+            year=tmax[i,0]
+            doy = tmax[i,3]
+            index = np.where((tmin[:,0]==year)&(tmin[:,3]==doy))
+            if np.shape(index)[1]>0:
+                tminval = tmin[index,4][0][0]
+                outer.append([tmax[i,0],tmax[i,1],tmax[i,2],tmax[i,3],tmax[i,4],tminval])
         
-        #Creates a big array of matching indices. 
-        tmidarr=np.array([self.tmaxval[self.matching,4],self.tminval[self.matching,4]])  
+        outer=np.asarray(outer)
+        #Evaluates the means. 
+        means = np.nanmean(np.array([outer[:,4],outer[:,5]]),axis=0)
+        #Grabs the dates. 
+        dates=outer[:,0:4]
+        #Then combines verything into a single matrix to be returned. 
+        returner1 = np.insert(dates,4,means,axis=1)
+        returner1=np.insert(returner1,5,self.yaml['TMID_INDEX'],axis=1) 
         
-        #Then evaluates means, and puts them together into one matrix. 
-        tmidmean=np.nanmean(tmidarr,axis=0)
-       #YOU HAVE TO CORRECT THE DATES OUTPUT, IT IS'T YET WORKING. 
-        self.dates=self.tmaxval[self.matching,0:4]
-        returner = np.insert(self.dates,4,tmidmean,axis=1)
-        returner=np.insert(returner,5,self.yaml['TMID_INDEX'],axis=1) 
+        #These steps then scrub out any years in TMID day which
+        #do not include 12 months of data
+        #This is improtant, since if there are not all moths included
+        #It would bias results like yearly averages.
+        #First, assign a new variable, tmidex, to be ecleaned up.
+        tmidex=returner1
         
-        #Finally, combines the matrices for a return. 
-        returner=np.append(returner,self.tmaxval,axis=0)
-        returner=np.append(returner,self.tminval,axis=0)
-
-
+        wheres = []
+        #This loops over all of the unique years in the dataset.
+        uniqueyears=np.unique(tmidex[:,0])
+        for i in uniqueyears:
+            #First, finds the index values where the year is equal to year i.
+            index=np.where(tmidex[:,0]==i)
+            #Then, finds the unique months for this year, which shoudl be1 through 12.
+            months=np.unique(tmidex[index][:,1])
+            if len(months) ==12:
+                    #Only if the year has 12 months, is the year included in the final dataset. 
+                 wheres.append(index)
+        wheres = np.asarray(wheres).flatten()
+        tmidex1 = tmidex[wheres]
+        
+        #This ten combines the TMID, TMAX, and TMIN, into one big matrix. 
+        returner1=np.append(tmidex,tmax,axis=0)
+        #returner1=np.append(tmidex1,tmax,axis=0)
+        returner1=np.append(returner1,tmin,axis=0)
         if self.display==True: 
             executionTime = (time.time() - startTime)
             print("Time taken to create TMID using NUMPY " + str(executionTime))
-        self.checkit=returner
-        return returner
+        
+        return returner1
     
 #All analysis fucntions for a station are done in this object.
 #The input is stationdata, which shoudl be self.station_data_claned from the StationLoad object
@@ -347,7 +376,7 @@ class LoadStation :
 #autorun simply immediately runs the KPI key_metrics function if True 
 
 class StationAnalyzer :
-    def __init__(self,stationdata,refperiod=[np.datetime64('2020-01-31'),np.datetime64('2020-12-31')],autorun=True):
+    def __init__(self,stationdata,refperiod=['2020-01-31','2020-12-31'],autorun=True):
         
         #This YAML file contains a great deal of static information, 
         #such as directory information. 
@@ -362,19 +391,87 @@ class StationAnalyzer :
         self.tmax_array = self.all_data_long[np.where(self.all_data_long[:,5]==self.yaml['TMAX_INDEX'])][:,:5]
         
         #This then creates the yearly averages.
-        #First, find the beginning and end years.
+        #First, find the beginning and end years, and the number of years total.
         self.alltime_startyear=np.nanmin(self.tmax_array[:,0])
         self.alltime_endyear=np.nanmax(self.tmax_array[:,0])
+        self.alltime_number_years=self.alltime_endyear-self.alltime_startyear
         
-              
-        self.refstart=refperiod[0]
-        self.refend=refperiod[1]
+        #Converting strings to pandas date time
+        self.refstart=pd.DatetimeIndex([refperiod[0]])
+        self.refend=pd.DatetimeIndex([refperiod[1]])
+        
+        
+        
         
         #Runs the key_metrics function if desired
         if autorun==True:
             self.kpi=self.key_metrics()
             #print(self.kpi)
         
+        
+    #This function finds the Day of year, assuming every month has 31 days
+    #taking in a pd.DatetimeIndex object
+    def find_doy(self,pddate):
+        doy = pddate.day+(pddate.month-1)*31
+        return doy
+    
+    
+    #THIS ISN"T WORKING YET. SOME KIDN OF BUG WHEN TAKING IN THE REFSTART AND REFEND.
+    #This function creates beginning and end dates for two different pd datetimeIndex
+    #objects, and creates a range of 
+    def find_range(self,pddate1,pddate2):
+        #First, create simple forms of the Day of year and Year. 
+        doy1 = self.find_doy(pddate1)
+        doy2 = self.find_doy(pddate2)
+        year1=pddate1.year[0]
+        year2=pddate2.year[0]
+        #In the simple case, the referenc eperiod is in the same year,
+        #The array is very simple, jsut each row corresonding to the same year,
+        #with a year and DOY.
+        if year1==year2:
+            if doy1>doy2:
+                
+                print("Your reference period is improperly defined.")
+                print("THe first date must be before the second date.")
+                sys.exit("Break Error due to bad dates. .")
+            alldays = np.arange(doy1,doy2+1)
+            allyears = year1[0]
+            returner = np.transpose(np.array([np.repeat(year1,len(alldays)),alldays]))
+            
+        #If year1 is before year2, the array becomes more compelx. 
+        if year1 < year2:
+            #First, define the days for the first year. This includes the days from the
+            #begining of reference period to the end of the  eyra of teh reference period. 
+            year1days=np.arange(doy1,372+1)
+            returner = np.transpose(np.array([np.repeat(year1,len(year1days)),year1days]))
+            
+            #some specical steps have to eb taken, if there are more than 2 adjacent year included.
+            if ( year2 - year1 ) > 1 :
+                #First, define all the days in the list. 
+                dayskarr = np.arange(1,372+1)
+                for k in np.arange(year1+1,year2):
+                    #Then, over all years in between year 1 and eyar 2, create a new array
+                    #This one has DOY frmo 1 to 372 and every yera in the intermediate period. 
+                    
+                    yearkarr = np.transpose(np.array([np.repeat(k,len(dayskarr)),dayskarr]))
+                    returner = np.append(returner,yearkarr,axis=0)
+            
+            #Then, define the days for the seconds year. This includes the days from the
+            #end of reference period to the beginning of the year of the last year of reference. 
+            year2days=np.arange(1,doy2+1)
+            year2arr= np.transpose(np.array([np.repeat(year2,len(year2days)),year2days]))
+            returner = np.append(returner,year2arr,axis=0)
+            
+        if year1>year2:
+            
+            print("Your reference period is improperly defined.")
+            print("THe first year must be before the second year.")
+            sys.exit("Break Error due to bad dates. .")
+            
+            
+                
+        return returner    
+    
     #This creates a table (pd dataframe) of the key metrics of interest
     def key_metrics(self):       
         #This first does the calculations, finding TMID avreage, TMAx, and TMIn,
@@ -382,6 +479,10 @@ class StationAnalyzer :
         whole_tmid_mean=np.nanmean(self.tmid_array[:,4])
         whole_tmax=np.nanmax(self.tmax_array[:,4])
         whole_tmin=np.nanmin(self.tmin_array[:,4])
+        
+        #Calcualtes the frequency of extreme temperatures each year. 
+        hot_days = np.count_nonzero(self.tmax_array[:,4]>=self.yaml['HOTDAYS'])/(365)
+        cold_days = np.count_nonzero(self.tmin_array[:,4]<=self.yaml['COLDDAYS'])/(365)
         
         #This finds the index location of the max temperature
         #First, by finding its index locations. 
@@ -419,8 +520,10 @@ class StationAnalyzer :
                 "TMID_av_F_alltime":[whole_tmid_mean],
               "TMAX_F_alltime":[whole_tmax],
              "TMAX_alltime_date":[maxdate],
+             "Annual_days_over_"+str(self.yaml['HOTDAYS']):[hot_days],
              "TMIN_F_alltime":[whole_tmin],
              "TMIN_alltime_date":[mindate],
+             "Annual_days_under_"+str(self.yaml['COLDDAYS']):[cold_days],
              
              }
             )

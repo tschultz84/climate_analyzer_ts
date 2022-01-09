@@ -29,6 +29,11 @@
     #stations with no data prior to this year are not loaded. 
     BASEYEAR : 2000
     
+    #These days define how the "number of hot days" and "Number of cold days" are calculated.
+    #Days hotter or colder than this are coutned. 
+    HOTDAYS : 90
+    COLDDAYS: 30
+    
     #This is the lat/lon distance within which weather stations are serached.
     #This is used to streamline how fast the "closest station" function works. 
             #stations are only sorted by distance if they rae within +/- coord_radius
