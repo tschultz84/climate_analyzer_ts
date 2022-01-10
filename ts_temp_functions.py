@@ -13,7 +13,7 @@ import yaml
 import numpy as np
 from datetime import date
 import matplotlib.pyplot as plt
-
+import scipy.stats as stats
 
 #%%
 """
@@ -376,7 +376,7 @@ class LoadStation :
 #autorun simply immediately runs the KPI key_metrics function if True 
 
 class StationAnalyzer :
-    def __init__(self,stationdata,refperiod=['2020-01-31','2020-12-31'],autorun=True):
+    def __init__(self,stationdata,refst='2020-01-31',refend='2020-12-31',autorun=True):
         
         #This YAML file contains a great deal of static information, 
         #such as directory information. 
@@ -396,30 +396,47 @@ class StationAnalyzer :
         self.alltime_endyear=np.nanmax(self.tmax_array[:,0])
         self.alltime_number_years=self.alltime_endyear-self.alltime_startyear
         
-        #Converting strings to pandas date time
-        self.refstart=pd.DatetimeIndex([refperiod[0]])
-        self.refend=pd.DatetimeIndex([refperiod[1]])
+        #Creates strings of the ref periods for later access. 
+        self.refststr=refst
+        self.refendst=refend
+        
+        #Creating the arrayed reference period. 
+        self.refperiod=self.find_ref_range(refst,refend)
+        #creates baseline range.
+        self.baseperiod=self.find_baseline_range()
+        
+        #Creatse the actual values of TMID in the periods.
+        self.tmid_ref_data=self.tmid_selection(self.refperiod)
+        self.tmid_base_data=self.tmid_selection(self.baseperiod)
         
         
         
-        
-        #Runs the key_metrics function if desired
+        #Runs the key_metrics function if desired.
         if autorun==True:
             self.kpi=self.key_metrics()
-            #print(self.kpi)
+            self.charts=self.key_charts()
+            print(self.kpi)
+            print(self.charts)
+            
         
         
     #This function finds the Day of year, assuming every month has 31 days
     #taking in a pd.DatetimeIndex object
     def find_doy(self,pddate):
         doy = pddate.day+(pddate.month-1)*31
-        return doy
+        return doy[0]
     
-    
-    #THIS ISN"T WORKING YET. SOME KIDN OF BUG WHEN TAKING IN THE REFSTART AND REFEND.
     #This function creates beginning and end dates for two different pd datetimeIndex
-    #objects, and creates a range of 
-    def find_range(self,pddate1,pddate2):
+    #objects, and creates a range of days, int he form of [[Year1,Day of Year1],[Year1,DOY2],...]
+    #It takes in two pd.DatetimeIndex objects.
+    def find_ref_range(self,pddate1,pddate2):
+        #This function is supposed to be passed a Pandas datetimeIndex.
+        #If it's a string, a conversion is made. 
+        if type(pddate1)==str:
+            pddate1=pd.DatetimeIndex([pddate1])
+        if type(pddate2)==str:
+            pddate2=pd.DatetimeIndex([pddate2])
+        
         #First, create simple forms of the Day of year and Year. 
         doy1 = self.find_doy(pddate1)
         doy2 = self.find_doy(pddate2)
@@ -435,14 +452,21 @@ class StationAnalyzer :
                 print("THe first date must be before the second date.")
                 sys.exit("Break Error due to bad dates. .")
             alldays = np.arange(doy1,doy2+1)
-            allyears = year1[0]
+            allyears = year1
             returner = np.transpose(np.array([np.repeat(year1,len(alldays)),alldays]))
             
         #If year1 is before year2, the array becomes more compelx. 
         if year1 < year2:
+            
+            print("You included more than one year in the reference period.")
+            print("The analysis will include all days in all years included.")
+            print("I do this, since the baseline period is multiple years.")
+            print("In order to avoid seasonal bias, I have to average over the entrie year.")
+            print("For example if you enter 2020 Jan 1 to 2021 July 1 as a reference,")
+            print("this biases your result to be much warmer than average years")
             #First, define the days for the first year. This includes the days from the
             #begining of reference period to the end of the  eyra of teh reference period. 
-            year1days=np.arange(doy1,372+1)
+            year1days=np.arange(1,372+1)
             returner = np.transpose(np.array([np.repeat(year1,len(year1days)),year1days]))
             
             #some specical steps have to eb taken, if there are more than 2 adjacent year included.
@@ -458,19 +482,84 @@ class StationAnalyzer :
             
             #Then, define the days for the seconds year. This includes the days from the
             #end of reference period to the beginning of the year of the last year of reference. 
-            year2days=np.arange(1,doy2+1)
+            year2days=np.arange(1,372+1)
             year2arr= np.transpose(np.array([np.repeat(year2,len(year2days)),year2days]))
             returner = np.append(returner,year2arr,axis=0)
-            
-        if year1>year2:
-            
+          #And, throws an error if the years are not ordered properly.   
+        if year1>year2:        
             print("Your reference period is improperly defined.")
             print("THe first year must be before the second year.")
             sys.exit("Break Error due to bad dates. .")
-            
-            
-                
         return returner    
+    
+    #This then finds the Days of Year for the analyzed baseline period, such that
+    #the comparison is adequately seasonalized..
+    def find_baseline_range(self):
+        #Takes the unique days from the refperiod.
+        baseline_doy = np.unique(self.refperiod[:,1])
+        #Then, all the baseline years.
+        baseline_years = np.unique(self.tmid_array[:,0])
+        #and finally, limits it to the first set of baseline years.
+        baseline_years=baseline_years[0:self.yaml['BASENOYEARS']]
+        
+        #Then, create an array which contains all of the elemnts. 
+        #THe first column are the years.
+        #The second the DOY. 
+        #Creates a template. 
+        returner = np.empty([0,2])
+        #Loops over all unique years. 
+        for k in np.arange(np.min(baseline_years)+1,np.max(baseline_years)):
+            #THen, creates each row element and appends it.             
+            yearkarr = np.transpose(np.array([np.repeat(k,len(baseline_doy)),baseline_doy]))
+            returner = np.append(returner,yearkarr,axis=0)
+        return returner
+    
+    #This function finds the mean of TMID over a specific set of Days of Year.
+    def tmid_selection(self,range1):
+        #Finds the location
+        out=self.tmid_array
+        #doy=self.tmid_array[:,3]
+        year=self.tmid_array[:,0]
+        ref=range1
+
+        index = np.in1d(year,ref[:,0])
+        out=out[index]
+        index=np.in1d(out[:,3],ref[:,1])
+        out=out[index]
+        return out
+
+    #This completes a t-test of the reference vs. baseline period TMID values. 
+    #This function reviews the TMID data for the reference and baseline,
+    #compares them, does a t-test, and returns "TRUE" if pvalue is less than ALPHA
+    #(ALPHA beign defined in the YAML file) and FALSE otherwise. 
+    def do_t_test(self):
+        #Define the datasets. 
+        data1=self.tmid_ref_data[:,4]
+        data2=self.tmid_base_data[:,4]
+        #Scrub the not as number values. 
+        data1=data1[~np.isnan(data1)]
+        data2=data2[~np.isnan(data2)]
+        
+        """
+        if standard=True, perform a standard independent 2 sample t-test that 
+        assumes equal population variances. 
+        If False, perform Welch’s t-test, which does not
+        assume equal population variances. This is True by default.
+        Before we perform the test, we need to decide
+        if we’ll assume the two populations have equal
+        variances or not. As a rule of thumb, we can 
+        assume the populations have equal variances if 
+        the ratio of the larger sample variance to the smaller sample variance is less than 4:1. 
+        """
+        standard=True
+        if (np.var(data2)/np.var(data1) > 4 ) or (np.var(data2)/np.var(data1) <0.25 ):
+            standard=False
+        result = stats.ttest_ind(a=data1, b=data2, equal_var=standard)
+        pvalue = result[1]
+        if pvalue >= self.yaml['ALPHA']:
+            return False
+        if pvalue < self.yaml['ALPHA']:
+            return True
     
     #This creates a table (pd dataframe) of the key metrics of interest
     def key_metrics(self):       
@@ -480,9 +569,20 @@ class StationAnalyzer :
         whole_tmax=np.nanmax(self.tmax_array[:,4])
         whole_tmin=np.nanmin(self.tmin_array[:,4])
         
+        #This then calculates the mean over the ref and baseline periods. 
+        
+        ref_tmid_mean=np.nanmean(self.tmid_selection(self.refperiod)[:,4])
+        base_tmid_mean=np.nanmean(self.tmid_selection(self.baseperiod)[:,4])
+        
+        ref_max=np.nanmax(self.tmid_ref_data[:,4])
+        base_max=np.nanmax(self.tmid_base_data[:,4])
+        
+        ref_min=np.nanmin(self.tmid_selection(self.refperiod)[:,4])
+        base_min=np.nanmin(self.tmid_selection(self.baseperiod)[:,4])
+        
         #Calcualtes the frequency of extreme temperatures each year. 
-        hot_days = np.count_nonzero(self.tmax_array[:,4]>=self.yaml['HOTDAYS'])/(365)
-        cold_days = np.count_nonzero(self.tmin_array[:,4]<=self.yaml['COLDDAYS'])/(365)
+     #   hot_days = np.count_nonzero(self.tmax_array[:,4]>=self.yaml['HOTDAYS'])/(365)
+      #  cold_days = np.count_nonzero(self.tmin_array[:,4]<=self.yaml['COLDDAYS'])/(365)
         
         #This finds the index location of the max temperature
         #First, by finding its index locations. 
@@ -513,21 +613,33 @@ class StationAnalyzer :
             mindate.append(mindatestr)
      
         #This creates a dataframe of data points.
+        alltimestr1=str(self.tmid_array[0,0:3].astype(str))
+        alltimestr2=str(self.tmid_array[-1,0:3].astype(str))
+        basepd1=str(self.baseperiod[0,0:2].astype(str))
+        basepd2=str(self.baseperiod[-1,0:2].astype(str))
+        
         returner = pd.DataFrame(
             {
-             "first_year_in_record":[self.alltime_startyear],
-             "last_year_in_record":[self.alltime_endyear],
-                "TMID_av_F_alltime":[whole_tmid_mean],
-              "TMAX_F_alltime":[whole_tmax],
-             "TMAX_alltime_date":[maxdate],
-             "Annual_days_over_"+str(self.yaml['HOTDAYS']):[hot_days],
-             "TMIN_F_alltime":[whole_tmin],
-             "TMIN_alltime_date":[mindate],
-             "Annual_days_under_"+str(self.yaml['COLDDAYS']):[cold_days],
+             "Period of Measure":
+                 ["All Time:" +alltimestr1+" to "+alltimestr2,
+                 "Reference Period: "+self.refststr+" to "+self.refendst,
+                 "Baseline Period: "+basepd1+" to "+basepd2],
+                "Average TMID over period (F)":[whole_tmid_mean,ref_tmid_mean,base_tmid_mean],
+                
+                "Maximum Temperature over period (F)":[whole_tmax,ref_max,base_max],
+                "Date of Maximum Temperature":[maxdate,"Not yet calculated","Not yet calculated"],
+                "Minimum Temperature over period (F)":[whole_tmin,ref_min,base_min],
+                "Date of Minimum Temperature":[mindate,"Not yet calculated","Not yet calculated"],
+       
              
              }
             )
-        
+        print("Is the TMID average in your baseline v. reference period different?")
+        if self.do_t_test() == True:
+            string =     "Yes."
+        if self.do_t_test() == None:
+            string =     "No."
+        print(string)
         return returner   
     #end key_metrics
      #This creates several charts of interest.

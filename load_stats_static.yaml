@@ -27,7 +27,16 @@
 #HARDCODED PARAMETERS
     #BASEYEAR is the year before which station data must be availbale. 
     #stations with no data prior to this year are not loaded. 
-    BASEYEAR : 2000
+    BASEYEAR : 1970
+    
+    #BASENOYEARS is the number of years included in the baseline period. 
+    BASENOYEARS : 20
+    
+    #ALPHA is the alpha value cmoparing TMID in the reference and baseline period. 
+    #Basically if the P Value from the corresponding t-test exceeds this value,
+    #then a change is deteced.
+    ALPHA : 0.01
+    
     
     #These days define how the "number of hot days" and "Number of cold days" are calculated.
     #Days hotter or colder than this are coutned. 
