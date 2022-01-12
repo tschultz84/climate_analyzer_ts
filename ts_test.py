@@ -12,7 +12,7 @@ bzdata=LoadStation([45.647256643331126,-111.04060494981753],10,True,True) #Loadi
 
 #%%
 
-date1 = '2020-1-1'
+date1 = '2010-1-1'
 date2 = '2020-12-31'
 bzcalc=StationAnalyzer(bzdata.station_data_clean,date1,date2)
 
@@ -27,7 +27,7 @@ obdata=LoadStation([37.755663644,-122.506497974],10,True,True) #Loading in Ocean
 
 #%%
 date1 = '2010-1-1'
-date2 = '2020-12-31'
+date2 = '2020-12-1'
 obcalc=StationAnalyzer(obdata.station_data_clean,date1,date2)
 
 #print(obcalc.kpi)
@@ -36,7 +36,7 @@ obcalc=StationAnalyzer(obdata.station_data_clean,date1,date2)
 #%%
 sddata=LoadStation([32.741947,-117.239571],10,True,True) #Loading in Ocean Beach, San Diego coordinates
 #%%
-date1 = '2015-1-1'
+date1 = '2000-1-1'
 date2 = '2020-12-31'
 sdcalc=StationAnalyzer(sddata.station_data_clean)
 
@@ -44,7 +44,9 @@ sdcalc=StationAnalyzer(sddata.station_data_clean)
 
 dvtdata=LoadStation([32.659167, -116.099167],10,True,True) #Loading in Desert View Tower data
 #%%
-dvtcalc=StationAnalyzer(dvtdata.station_data_clean)
+date1 = '2000-1-1'
+date2 = '2020-12-31'
+dvtcalc=StationAnalyzer(dvtdata.station_data_clean,date1,date2)
 #print(dvtcalc.kpi)
 #dvtcalc.key_charts()
 #print(dvtcalc.maxdate)

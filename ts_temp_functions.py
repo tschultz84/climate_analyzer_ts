@@ -14,6 +14,7 @@ import numpy as np
 from datetime import date
 import matplotlib.pyplot as plt
 import scipy.stats as stats
+from sklearn.linear_model import LinearRegression
 
 #%%
 """
@@ -409,7 +410,41 @@ class StationAnalyzer :
         self.tmid_ref_data=self.tmid_selection(self.refperiod)
         self.tmid_base_data=self.tmid_selection(self.baseperiod)
         
+        #This creates an array with mean of all years. 
+        yearsout=np.empty([0,2])
+        for year in np.arange(self.alltime_startyear,self.alltime_endyear+1):
+                 
+            #Select only the index values wehre the year is equal to year.
+            index=np.where(self.tmid_array[:,0]==year)
+            #Then, selects data for this year
+            #All columns are pulled, since we have to filter to ensure ther eare 
+            #12 months for every year evaluated. 
+            all_years_data=self.tmid_array[index]
+            
+            #The data is only written into the new numpy array, if
+            #the number of months for the year is 12.
+            #This is evaluate dby counting the number of unique days
+            #in each year, which must exceed 330. 
+            if len(all_years_data)>11*30:
+                #And evaluates their mean. 
+                all_years_means=np.nanmean(all_years_data[:,4])
+                row=np.array([year,all_years_means])
+                yearsout=np.append(yearsout,[row],axis=0)
+        self.all_years_mean=yearsout
         
+        #This creates an array with mean of all months. 
+        monthout=np.empty([12,2])
+        for month in np.arange(1,13):
+            
+            #Select only the index values wehre the month is equal to month. 
+            index=np.where(self.tmid_array[:,1]==month)
+            #Then, selects values for this month
+            all_months_data=self.tmid_array[index,4]
+            #And evaluates their mean. 
+            all_months_means=np.nanmean(all_months_data)
+            monthout[month-1,0]=month
+            monthout[month-1,1]=all_months_means
+        self.all_months_mean=monthout
         
         #Runs the key_metrics function if desired.
         if autorun==True:
@@ -555,11 +590,33 @@ class StationAnalyzer :
         if (np.var(data2)/np.var(data1) > 4 ) or (np.var(data2)/np.var(data1) <0.25 ):
             standard=False
         result = stats.ttest_ind(a=data1, b=data2, equal_var=standard)
-        pvalue = result[1]
-        if pvalue >= self.yaml['ALPHA']:
-            return False
-        if pvalue < self.yaml['ALPHA']:
-            return True
+        return result
+    
+    #This creates a trend line.
+    #It takes as input a numpy array int he format of self.all_years_mean
+    def create_trend_line(self,yearsdata):
+        #First, format, and take only the recent years of data.
+        recentyears=self.yaml['RECENT_TREND_YEARS']
+        x = yearsdata[-recentyears:,0].reshape(-1,1)
+        y = yearsdata[-recentyears:,1]
+        #This statement creates the variable model as the instance of LinearRegression. 
+        model = LinearRegression()
+        # call .fit() on model:
+        model.fit(x,y) 
+        intercept = model.intercept_
+        slope = model.coef_
+        
+        return_arr = np.empty([0,2])
+        for k in np.arange(0,len(x)):
+            year = x[k]
+            value = slope*year + intercept
+            arr = [year,value]
+            return_arr = np.append(return_arr,arr)
+        return_arr = np.reshape(return_arr,[-1,2])
+        
+        return slope,intercept,return_arr
+            
+        
     
     #This creates a table (pd dataframe) of the key metrics of interest
     def key_metrics(self):       
@@ -634,14 +691,28 @@ class StationAnalyzer :
              
              }
             )
-        print("Is the TMID average in your baseline v. reference period different?")
-        if self.do_t_test() == True:
-            string =     "Yes."
-        if self.do_t_test() == None:
-            string =     "No."
-        print(string)
+        t_test = self.do_t_test()
+        print("T Test Finding:")
+        print(t_test)
+        pvalue = t_test[1]
+        print("The Ref period is "+str(int((ref_tmid_mean-base_tmid_mean)*100)/100)+"F warmer than your base period.")
+        print("Is this difference statistically different, ")
+        print(" with a probability that this occured by chance less than "+str(self.yaml['ALPHA']))
+        print(" i.e., alpha is "+str(self.yaml['ALPHA'])+str("?"))
+      #  print(self.do_t_test())
+        if pvalue >= self.yaml['ALPHA']:
+           print("No.")
+        if pvalue < self.yaml['ALPHA']:
+           print("Yes.") 
+        
+        real_trend_data=self.create_trend_line(self.all_years_mean)
+        print("Over the last "+str(self.yaml['RECENT_TREND_YEARS'])+" years,")
+        print("The warming rate has been "+str(real_trend_data[0]*10)+" degrees F per decade.")
+        
         return returner   
     #end key_metrics
+    
+            
      #This creates several charts of interest.
     def key_charts(self):
   
@@ -652,54 +723,42 @@ class StationAnalyzer :
         plt.ylabel('Temperature, F (TMID)')
         plt.show()
         
-        #This creates an array with mean of all months. 
-        yearsout=np.empty([0,2])
-        for year in np.arange(self.alltime_startyear,self.alltime_endyear+1):
-                 
-            #Select only the index values wehre the year is equal to year.
-            index=np.where(self.tmid_array[:,0]==year)
-            #Then, selects data for this year
-            #All columns are pulled, since we have to filter to ensure ther eare 
-            #12 months for every year evaluated. 
-            all_years_data=self.tmid_array[index]
-            
-            #The data is only written into the new numpy array, if
-            #the number of months for the year is 12.
-            #This is evaluate dby counting the number of unique days
-            #in each year, which must exceed 330. 
-            if len(all_years_data)>11*30:
-                #And evaluates their mean. 
-                all_years_means=np.nanmean(all_years_data[:,4])
-                row=np.array([year,all_years_means])
-                yearsout=np.append(yearsout,[row],axis=0)
-        yearsmean=yearsout
-        
-        
-        #Creates a plot over time of the annual average values. 
-        plt.plot(yearsmean[:,0],yearsmean[:,1])
-        plt.title('Annual Average of Monthly TMID')
-        plt.xlabel('Year')
-        plt.ylabel('Annual Average Temperature, F (TMID)')
-        plt.show()
-        
-        #This creates an array with mean of all months. 
-        monthout=np.empty([12,2])
-        for month in np.arange(1,13):
-            
-            #Select only the index values wehre the month is equal to month. 
-            index=np.where(self.tmid_array[:,1]==month)
-            #Then, selects values for this month
-            all_months_data=self.tmid_array[index,4]
-            #And evaluates their mean. 
-            all_months_means=np.nanmean(all_months_data)
-            monthout[month-1,0]=month
-            monthout[month-1,1]=all_months_means
             
         #Creates a plot over one year of the monthyl average TMID temperatures. 
-        plt.plot(monthout[:,0],monthout[:,1])
+        plt.plot(self.all_months_mean[:,0],self.all_months_mean[:,1])
         plt.title('Monthly Average of TMID')
         plt.xlabel('Month')
         plt.ylabel('Monthly Average Temperature, F (TMID)')
         plt.show()
          
+        #This creates a lienar trend to superimpose on the chart.
+        trenddat=self.create_trend_line(self.all_years_mean)
+        #Pulls out the slope for chart labeling. 
+        slope=trenddat[0][0]
+        #Then creates the trend line data. 
+        trendline=trenddat[2]
+        trend_x = trendline[:,0]
+        trend_y = trendline[:,1]
+        
+        #Creates a plot over time of the annual average values. 
+        plt.plot(self.all_years_mean[:,0],self.all_years_mean[:,1])
+        plt.plot(trend_x,trend_y, color='black',  linestyle='dashed')
+        plt.text(np.mean(trend_x),np.mean(trend_y)+1,str('Trend: '+str(round(slope*10,1))+"F/decade"),horizontalalignment='center')
+        plt.title('Annual Average of Monthly TMID')
+        plt.xlabel('Year')
+        plt.ylabel('Annual Average Temperature, F (TMID)')
+        #This creates a span for the baseline which is superimposed on the chart. 
+        basespan_min=self.baseperiod[0,0]
+        basespan_max=self.baseperiod[-1,0]
+        plt.text((basespan_min + basespan_max)/2,np.nanmin(self.all_years_mean[:,1]),'Baseline',horizontalalignment='center')
+        plt.axvspan(basespan_min, basespan_max, facecolor='g', alpha=0.5)
+        #And the same for the reference period. 
+        refspan_min=self.refperiod[0,0]
+        refspan_max=self.refperiod[-1,0]
+        if refspan_min == refspan_max :
+            refspan_max = refspan_max + 1
+        plt.axvspan(refspan_min, refspan_max, facecolor='r', alpha=0.5)
+        plt.text((refspan_min + refspan_max)/2,np.nanmin(self.all_years_mean[:,1]),'Reference',horizontalalignment='center')
+        
+        plt.show()
                 

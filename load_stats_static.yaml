@@ -32,6 +32,10 @@
     #BASENOYEARS is the number of years included in the baseline period. 
     BASENOYEARS : 20
     
+    #RECENT_TREND_YEARS is the number of years included (starting from the final year in the dataset).
+    #in the annual temperature average trendline.  The linear trend is calculated only over this period.
+    RECENT_TREND_YEARS : 20
+    
     #ALPHA is the alpha value cmoparing TMID in the reference and baseline period. 
     #Basically if the P Value from the corresponding t-test exceeds this value,
     #then a change is deteced.
