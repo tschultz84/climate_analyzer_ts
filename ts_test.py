@@ -12,8 +12,8 @@ bzdata=LoadStation([45.647256643331126,-111.04060494981753],10,True,True) #Loadi
 
 #%%
 
-date1 = '2010-1-1'
-date2 = '2020-12-31'
+date1 = '2021-6-1'
+date2 = '2021-8-30'
 bzcalc=StationAnalyzer(bzdata.station_data_clean,date1,date2,display=True)
 
 #test=bzcalc.tmid_selection(bzcalc.refperiod)

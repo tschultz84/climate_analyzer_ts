@@ -632,17 +632,22 @@ class StationAnalyzer :
         whole_tmid_mean=np.nanmean(self.tmid_array[:,4])
         whole_tmax=np.nanmax(self.tmax_array[:,4])
         whole_tmin=np.nanmin(self.tmin_array[:,4])
+        whole_tmid_var=np.nanvar(self.tmid_array[:,4])
         
         #This then calculates the mean over the ref and baseline periods. 
         
         ref_tmid_mean=np.nanmean(self.tmid_selection(self.refperiod)[:,4])
         base_tmid_mean=np.nanmean(self.tmid_selection(self.baseperiod)[:,4])
-        
+        #And max, min. 
         ref_max=np.nanmax(self.tmid_ref_data[:,4])
         base_max=np.nanmax(self.tmid_base_data[:,4])
         
         ref_min=np.nanmin(self.tmid_selection(self.refperiod)[:,4])
         base_min=np.nanmin(self.tmid_selection(self.baseperiod)[:,4])
+        
+        #And variance. 
+        ref_tmid_var=np.nanvar(self.tmid_selection(self.refperiod)[:,4])
+        base_tmid_var=np.nanvar(self.tmid_selection(self.baseperiod)[:,4])
         
         #Calcualtes the frequency of extreme temperatures each year. 
      #   hot_days = np.count_nonzero(self.tmax_array[:,4]>=self.yaml['HOTDAYS'])/(365)
@@ -689,6 +694,7 @@ class StationAnalyzer :
                  "Reference Period: "+self.refststr+" to "+self.refendst,
                  "Baseline Period: "+basepd1+" to "+basepd2],
                 "Average TMID over period (F)":[whole_tmid_mean,ref_tmid_mean,base_tmid_mean],
+                "Variance of TMID over period (F)":[whole_tmid_var,ref_tmid_var,base_tmid_var],
                 
                 "Maximum Temperature over period (F)":[whole_tmax,ref_max,base_max],
                 "Date of Maximum Temperature":[maxdate,"Not yet calculated","Not yet calculated"],
@@ -734,11 +740,16 @@ class StationAnalyzer :
      #This creates several charts of interest.
     def key_charts(self):
   
+        
         #Creates a histogram of daily TMID values. 
-        plt.hist(self.tmid_array[:,4],bins=30,density=True)
-        plt.title('Freqency Histogram of TMID')
+        ref_hist=self.tmid_selection(self.refperiod)[:,4]
+        base_hist=self.tmid_selection(self.baseperiod)[:,4]
+        plt.hist(ref_hist,bins=30,density=True,label="Reference Period", alpha=0.5)
+        plt.hist(base_hist,bins=30,density=True,label="Base Period", alpha=0.5)
+        plt.title('Freqency Histogram of TMID over Reference and Base Period')
         plt.xlabel('Fraction of Total at this TMID')
         plt.ylabel('Temperature, F (TMID)')
+        plt.legend()
         plt.show()
         
             
