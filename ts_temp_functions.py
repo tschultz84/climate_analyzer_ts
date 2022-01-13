@@ -377,8 +377,9 @@ class LoadStation :
 #autorun simply immediately runs the KPI key_metrics function if True 
 
 class StationAnalyzer :
-    def __init__(self,stationdata,refst='2020-01-31',refend='2020-12-31',autorun=True):
+    def __init__(self,stationdata,refst='2020-01-31',refend='2020-12-31',autorun=True,display=False):
         
+        self.display=display
         #This YAML file contains a great deal of static information, 
         #such as directory information. 
         yaml_file = open("load_stats_static.yaml")
@@ -594,7 +595,13 @@ class StationAnalyzer :
     
     #This creates a trend line.
     #It takes as input a numpy array int he format of self.all_years_mean
-    def create_trend_line(self,yearsdata):
+    #Its output is a tuple, with the first two being the slope and intercept.
+    #and the third element is an array of the year and value of the line according to this regression.
+    #If array=False, then this array is not generated or returned (this is for the permutation step)
+    def create_trend_line(self,yearsdata,array=True):
+        #If array was set improperly, automatically change it to a Boolean true value. 
+        if (array != False) & (array != True):
+            array = True
         #First, format, and take only the recent years of data.
         recentyears=self.yaml['RECENT_TREND_YEARS']
         x = yearsdata[-recentyears:,0].reshape(-1,1)
@@ -605,18 +612,68 @@ class StationAnalyzer :
         model.fit(x,y) 
         intercept = model.intercept_
         slope = model.coef_
-        
-        return_arr = np.empty([0,2])
-        for k in np.arange(0,len(x)):
-            year = x[k]
-            value = slope*year + intercept
-            arr = [year,value]
-            return_arr = np.append(return_arr,arr)
-        return_arr = np.reshape(return_arr,[-1,2])
-        
-        return slope,intercept,return_arr
+        if array == True:
+            return_arr = np.empty([0,2])
+            for k in np.arange(0,len(x)):
+                year = x[k]
+                value = slope*year + intercept
+                arr = [year,value]
+                return_arr = np.append(return_arr,arr)
+            return_arr = np.reshape(return_arr,[-1,2])
             
+            return slope,intercept,return_arr
+        if array == False:
+            return slope,intercept
         
+    #This function creates a set of slopes by permuting the data.
+    #Data must be in the format of self.all_years_mean,
+    #so that it can be submitted to self.create_trend_line
+    #n is the number of permutations. 
+    #If hist is true, show a histogram.
+    #It returns the precentile value of the real slope in the permuted set.
+
+    def permuted_slopes(self,n=1000):
+        if self.display == True : startTime = time.time()
+        #First, create the actual values. 
+        real_data = self.create_trend_line(self.all_years_mean,array=False)
+        #initialize the array that wil be returned. 
+        slopes=np.array([real_data[0]])
+        #Create a loop over n, to create the permutations.
+        for i in np.arange(0,n):
+            #Pull out the data into seaprate arrays. 
+            years = self.all_years_mean[:,0]
+            values=self.all_years_mean[:,1]
+            #Permute the values data. 
+            values = np.random.permutation(values)
+            #Combine them into a format suitable for submissin to create_trend_line
+            comb = np.array([years,values]).reshape(-1,2)
+            next1 = self.create_trend_line(comb,array=False)
+            #Then append. You multiply next1 * 10 in orer toc reate
+            #an output in the units of F / decade.
+            slopes = np.append(slopes,next1[0])
+        if self.display == True:
+            #Creates a histogram of all permuted slope values. 
+            plt.hist(slopes,bins=30,density=True)
+            plt.title('Frequency of permuted Slopes (line shows real slope')
+            plt.ylabel('Fraction of Total')
+            plt.xlabel('Slope Value (F warming per year')
+            plt.axvline (x=real_data[0],color='k', linestyle='--')
+            plt.show()
+        
+        #This calculates the percentile value. ()
+        #This is the actual value that indicates the probability of this happening 
+        #by chance. 
+        percentile_value = np.count_nonzero(slopes<real_data[0])/len(slopes)  
+        #A mock "p-value" is created based on how far outside the bell curve
+        #of typical slopes exists. It converts the percentile value to a value that indciates a p-value
+        if percentile_value >= .5:
+            p_value =1 - percentile_value
+        if percentile_value <.5 : p_value = percentile_value    
+        if(self.display):
+            executionTime = (time.time() - startTime)
+            print("Time taken to calculate "+str(n)+" permuted slope values." + str(executionTime))   
+            print("That is "+str(round(100*executionTime/n,2))+" seconds per 100 permutations.")
+        return percentile_value,p_value
     
     #This creates a table (pd dataframe) of the key metrics of interest
     def key_metrics(self):       
@@ -692,8 +749,8 @@ class StationAnalyzer :
              }
             )
         t_test = self.do_t_test()
-        print("T Test Finding:")
-        print(t_test)
+        #print("T Test Finding:")
+        #print(t_test)
         pvalue = t_test[1]
         print("The Ref period is "+str(int((ref_tmid_mean-base_tmid_mean)*100)/100)+"F warmer than your base period.")
         print("Is this difference statistically different, ")
@@ -708,6 +765,13 @@ class StationAnalyzer :
         real_trend_data=self.create_trend_line(self.all_years_mean)
         print("Over the last "+str(self.yaml['RECENT_TREND_YEARS'])+" years,")
         print("The warming rate has been "+str(real_trend_data[0]*10)+" degrees F per decade.")
+        is_trend_real=self.permuted_slopes()
+        print("The probability of this occurring by chance "+str(round(is_trend_real[1]*100,2))+"%.")
+        if is_trend_real[1] < self.yaml['ALPHA']:
+            is_real = True
+        if is_trend_real[1] >= self.yaml['ALPHA']:
+            is_real = False
+        print("Is this trened real? "+str(is_real))
         
         return returner   
     #end key_metrics

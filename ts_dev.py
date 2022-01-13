@@ -27,14 +27,54 @@ def find_doy(pddate):
 print(find_doy(start))
 
 #%%
-data1=bzcalc.tmid_ref_data[:,4]
-data2=bzcalc.tmid_base_data[:,4]
 
-data1=data1[~np.isnan(data1)]
-data2=data2[~np.isnan(data2)]
+dataval=bzcalc.all_years_mean
 
-print(np.var(data2)/np.var(data1))
+#This function creates a set of slopes by permuting the data.
+#Data must be in the format of self.all_years_mean,
+#so that it can be submitted to self.create_trend_line
+#n is the number of permutations. 
+#If hist is true, show a histogram.
+#It returns the precentile value of the real slope in the permuted set.
 
-print(stats.ttest_ind(a=data1, b=data2, equal_var=True))
-
+def permuted_slopes(data,n=1000,hist=False,display=False):
+    if display == True : startTime = time.time()
+    #First, create the actual values. 
+    real_data = bzcalc.create_trend_line(data,array=False)
+    #initialize the array that wil be returned. 
+    slopes=np.array([real_data[0]])
+    #Create a loop over n, to create the permutations.
+    for i in np.arange(0,n):
+        #Pull out the data into seaprate arrays. 
+        years = data[:,0]
+        values=data[:,1]
+        #Permute the values data. 
+        values = np.random.permutation(values)
+        #Combine them into a format suitable for submissin to create_trend_line
+        comb = np.array([years,values]).reshape(-1,2)
+        next1 = bzcalc.create_trend_line(comb,array=False)
+        #Then append. You multiply next1 * 10 in orer toc reate
+        #an output in the units of F / decade.
+        slopes = np.append(slopes,10*next1[0])
+    if hist == True:
+        #Creates a histogram of all permuted slope values. 
+        plt.hist(slopes,bins=30,density=True)
+        plt.title('Frequency of permuted Slopes (line shows real slope')
+        plt.ylabel('Fraction of Total')
+        plt.xlabel('Slope Value (F warming per decade')
+        plt.axvline (x=real_data[0],color='k', linestyle='--')
+        plt.show()
     
+    #This calculates the percentile value. ()
+    #This is the actual value that indicates the probability of this happening 
+    #by chance. 
+    percentile_value = np.count_nonzero(slopes<real_data[0])/len(slopes)   
+
+    if(display):
+        executionTime = (time.time() - startTime)
+        print("Time taken to calculate "+str(n)+" permuted slope values." + str(executionTime))   
+        print("That is "+str(round(100*executionTime/n,2))+" seconds per 100 permutations.")
+    return percentile_value
+orig = dataval[:,1]
+test=permuted_slopes(dataval,5000,True,True)
+print(test)
