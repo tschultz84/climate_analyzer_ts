@@ -15,7 +15,7 @@ from datetime import date
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 from sklearn.linear_model import LinearRegression
-
+from scipy.stats.stats import pearsonr
 #%%
 """
 This object has functions to identify the station nearest to a reference lat, lon.
@@ -624,56 +624,6 @@ class StationAnalyzer :
             return slope,intercept,return_arr
         if array == False:
             return slope,intercept
-        
-    #This function creates a set of slopes by permuting the data.
-    #Data must be in the format of self.all_years_mean,
-    #so that it can be submitted to self.create_trend_line
-    #n is the number of permutations. 
-    #If hist is true, show a histogram.
-    #It returns the precentile value of the real slope in the permuted set.
-
-    def permuted_slopes(self,n=1000):
-        if self.display == True : startTime = time.time()
-        #First, create the actual values. 
-        real_data = self.create_trend_line(self.all_years_mean,array=False)
-        #initialize the array that wil be returned. 
-        slopes=np.array([real_data[0]])
-        #Create a loop over n, to create the permutations.
-        for i in np.arange(0,n):
-            #Pull out the data into seaprate arrays. 
-            years = self.all_years_mean[:,0]
-            values=self.all_years_mean[:,1]
-            #Permute the values data. 
-            values = np.random.permutation(values)
-            #Combine them into a format suitable for submissin to create_trend_line
-            comb = np.array([years,values]).reshape(-1,2)
-            next1 = self.create_trend_line(comb,array=False)
-            #Then append. You multiply next1 * 10 in orer toc reate
-            #an output in the units of F / decade.
-            slopes = np.append(slopes,next1[0])
-        if self.display == True:
-            #Creates a histogram of all permuted slope values. 
-            plt.hist(slopes,bins=30,density=True)
-            plt.title('Frequency of permuted Slopes (line shows real slope')
-            plt.ylabel('Fraction of Total')
-            plt.xlabel('Slope Value (F warming per year')
-            plt.axvline (x=real_data[0],color='k', linestyle='--')
-            plt.show()
-        
-        #This calculates the percentile value. ()
-        #This is the actual value that indicates the probability of this happening 
-        #by chance. 
-        percentile_value = np.count_nonzero(slopes<real_data[0])/len(slopes)  
-        #A mock "p-value" is created based on how far outside the bell curve
-        #of typical slopes exists. It converts the percentile value to a value that indciates a p-value
-        if percentile_value >= .5:
-            p_value =1 - percentile_value
-        if percentile_value <.5 : p_value = percentile_value    
-        if(self.display):
-            executionTime = (time.time() - startTime)
-            print("Time taken to calculate "+str(n)+" permuted slope values." + str(executionTime))   
-            print("That is "+str(round(100*executionTime/n,2))+" seconds per 100 permutations.")
-        return percentile_value,p_value
     
     #This creates a table (pd dataframe) of the key metrics of interest
     def key_metrics(self):       
@@ -761,18 +711,22 @@ class StationAnalyzer :
            print("No.")
         if pvalue < self.yaml['ALPHA']:
            print("Yes.") 
-        
-        real_trend_data=self.create_trend_line(self.all_years_mean)
-        print("Over the last "+str(self.yaml['RECENT_TREND_YEARS'])+" years,")
-        print("The warming rate has been "+str(real_trend_data[0]*10)+" degrees F per decade.")
-        is_trend_real=self.permuted_slopes()
-        print("The probability of this occurring by chance "+str(round(is_trend_real[1]*100,2))+"%.")
-        if is_trend_real[1] < self.yaml['ALPHA']:
+
+        trend_data = self.create_trend_line(self.all_years_mean,False)
+        print("The warming trend over the past "+str(self.yaml['RECENT_TREND_YEARS'])+" is: "+str(trend_data[0]*10)+" F degrees per decade.")
+        #This calculates the correlation coefficient and accompanying p-value
+        #which states whether this correlation is statistically significant. 
+        pearsond1 = pearsonr(self.all_years_mean[:,0],self.all_years_mean[:,1])
+                
+        print("Outcome of Pearson Correlation Coefficient Analysis: ")
+        print("Coefficient of Correlation (R): "+str(pearsond1[0]))
+        print("Accompanying P value: "+str(pearsond1[1]))
+        if pearsond1[1] < self.yaml['ALPHA']:
             is_real = True
-        if is_trend_real[1] >= self.yaml['ALPHA']:
+        if pearsond1[1] >= self.yaml['ALPHA']:
             is_real = False
-        print("Is this trened real? "+str(is_real))
-        
+        print("Is this trened real using Pearson correlation analysis? "+str(is_real))
+     
         return returner   
     #end key_metrics
     
