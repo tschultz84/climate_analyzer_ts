@@ -4,6 +4,9 @@ Created on Wed Dec 29 13:10:53 2021
 
 @author: 14154
 """
+import os
+dir1 = "C:\\Users\\14154\\OneDrive\\Python\\climate_mapper\\python\\climate_analyzer_ts\\"
+os.chdir(dir1)
 import Station_Loader_ts as load
 import Station_analyzer_ts as analyze
 
