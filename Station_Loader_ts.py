@@ -12,6 +12,8 @@ import sys
 import yaml
 import numpy as np
 from datetime import date
+import requests
+
 
 #%%
 """
@@ -19,7 +21,7 @@ This object has functions to identify the station nearest to a reference lat, lo
 The inputs are as follows:
 *point is a list, in the form [latitude,longitude], which is the reference point
 (data will be lodded for the station closest to these coordinations, unless stid is not None)
-*numsts is the number of stations returned during the search, default = 10
+
 *stid is a manually entered station. If stid is not None, then point is overriden, 
 and the specific station ID is instead searched for. 
 #autorun runs all the functions automatically. 
@@ -35,26 +37,42 @@ and the specific station ID is instead searched for.
     self.station_data is a dataframe ahving loaded all the statin's data. '
 """    
 class LoadStation :
-    def __init__(self,point,numsts=10,autorun=True,printudpate=False):
+    def __init__(self,point,printudpate=False):
                 
         self.display=  printudpate   
-
-        self.numstats = numsts
-
-        self.refpoint=Point(point[1],point[0])
+        #If a point (lat, lon) is passed, then create a point. 
+        if (type(point) != str) and (len(point)==2):
+            self.refpoint=Point(point[1],point[0])
         
         #This YAML file contains a great deal of static information, 
         #such as directory information. 
         yaml_dir="C:\\Users\\14154\\OneDrive\\Python\\climate_mapper\\python\\climate_analyzer_ts\\"
         yaml_file = open(yaml_dir+"load_stats_static.yaml")
         self.yaml = yaml.load(yaml_file, Loader=yaml.FullLoader)
+        """
+        The following few lines automatically run all the functions at initiation.
+        """
+        if self.display: startTime = time.time() 
+        #If point is a string, you skip finding any station, and go righ o the loader. 
+        if type(point) == str:
+            self.station_data=self.load_station(point)
         
-        #This automatically runs the functions.
-        if autorun==True:
-            self.closest_stations = self.nearest_station()
-            self.station_data=self.load_station(self.closest_stations.iloc[1,0])
-            self.station_data_clean=self.StationDataCleaner()
-      #      self.station_data_clean=self.calculate_tmid(self.station_data_clean)
+        #If point is not a string, but a point, run the function to find
+        #the nearest station.     
+        if type(point) != str:    
+            self.closest_stations = self.nearest_station(point)
+            if(self.display): 
+                print("Time to locate nearest weather stations:" + str(time.time() - startTime))
+                startTime = time.time() 
+            self.station_data=self.load_station(self.id_closest_st)
+        if(self.display): 
+            print("Time to load this station data:" + str(time.time() - startTime))
+            startTime = time.time() 
+        
+        self.station_data=self.StationDataCleaner(self.station_data)
+        
+        if(self.display): 
+            print("Time to clean up this data:" + str(time.time() - startTime))
     """    
     #This function as a default takes the LoadStation object's
     #reference point of interest and searches for the nearest point in our list of points,
@@ -65,9 +83,9 @@ class LoadStation :
     The input 'num' is the number of closest stations returned
     
     """
-    def nearest_station(self):
-       pt=self.refpoint
-       if self.display == True : startTime = time.time()
+    def nearest_station(self,point):
+       pt=point
+       
        #DATAPATH is just where ghcnd-stations and ghcnd-inventory are located on your hard drive.
        #stDATAPATH = "C:\\ts_big_data_files\\"
        #This initializes the actual data to search, from the list of stations
@@ -113,7 +131,7 @@ class LoadStation :
        #4*num are selected, since in the next stage, we re-sort by actual distance (miles)
        #this is relevant because the distance, calculated above as cartesian distance using lat/lon,
        #is not accurate, and the distance in miles may very enough to change which stations are closest
-       otw=df.iloc[t2.index[0:4*self.numstats]]
+       otw=df.iloc[t2.index[0:40]]
        
        #This creates a dataseries which calculates the distancef rom the ref "pt"
        #to all of the nearest 20 stations.
@@ -126,8 +144,8 @@ class LoadStation :
        #and then sorts by miles from ref, to find the closest stations
        returner=otw.sort_values(by='Miles_from_Ref')
        
-       #Then return the closest numstats stations.
-       returner=returner[0:self.numstats]
+       #Then return the closest 10 stations.
+       returner=returner[0:10]
        
        #This sets a variable which is the ID Of the nearest station
        self.id_closest_st = returner.iloc[0,0]
@@ -149,9 +167,7 @@ class LoadStation :
 
        final = refdf.append(returner)
        #Prints the output, if that is selected.
-       if(self.display):
-           executionTime = (time.time() - startTime)
-           print("Time taken to locate nearest "+str(self.numstats)+" weather stations." + str(executionTime))
+       
     
        return final
     
@@ -182,21 +198,40 @@ class LoadStation :
     #As default, station = None, and the id_closest_st for thsi object is run.
     #The station value must be a string. 
     def load_station(self,station=None):
-        #This timer is used to check how long it takes to run the station read in function. 
-        if self.display == True :
-           startTime = time.time()
+
         #If statino is none, then defaults to the station closest to the ref point. 
         if station == None:
             station=self.id_closest_st
-        
+        """
         #This assigns the filename where station info is located.
         filename=self.yaml['DATAPATH']+str(station)+'.dly'
+        
         #This checks the file exists and breask if it does not.
         #(If it doesn't exist, the submitted station ID was in error.)
         if os.path.exists(filename) == False:
             print("Bad Station ID. The file called "+filename+" does not exist.")
             print("Please check your station ID "+str(station)+" and re-submit.")
             sys.exit("Break Error in load_station of StationReader: Bad Station ID.")
+        """
+        #Downloading the CSV file straight rom NOAA.
+        #First, assigning the URL Name.
+        csv_url = self.yaml['NOAA_URL']+str(station)+'.csv'
+        
+        if self.display == True: 
+            #This gets the filesize.
+            info=requests.head(csv_url)
+            filesize = int(info.headers['Content-Length'])/1000000
+            print("Beginning to download "+csv_url+' ('+str(filesize)+"MB). Please wait while the file is transferred.")
+        #Then, checking i it exists. the script breaks if the file does not exist.
+        response = requests.get(csv_url)
+        if response.status_code!= 200:
+            
+            print("Bad Station ID. The file called "+csv_url+" does not exist.")
+            print("Please check your station ID "+str(station)+" and re-submit.")
+            sys.exit("Break Error in load_station of StationReader: Bad Station ID.")
+        #Then, downloads the file. 
+        inter0 = pd.read_csv(csv_url)
+        """
         #You have designed this script so it only reads in the lines where data is useful
         #and excludes other elements. 
         #When testing reading in the very largest data file, you would typically save
@@ -220,15 +255,11 @@ class LoadStation :
         inter0 = pd.DataFrame()      
         #This then Reads out the next file.  
         inter0 = pd.read_fwf(filename,colspecs=self.yaml['datacolnums'],skiprows=skiprows1+1)
-        inter0.columns=self.yaml['datacolnames']
-            
-    
+        """
+
         #This is a dataframe of all the data.
-        self.station_data=inter0
+        #self.station_data=inter0
         
-        if self.display == True :
-            executionTime = (time.time() - startTime)
-            print('Time taken to load data for +'+str(station)+' using load_station: ' + str(executionTime))
         return inter0
  
     
@@ -241,18 +272,53 @@ class LoadStation :
       Currently these cleaning operations are completed:
           *Change -9999 values to np.nan
     """
-    def StationDataCleaner(self,stationd=None):
+    def StationDataCleaner(self,stationd):
         #If station=d is none, just default to using self.station_data
-        if stationd==None: stationd = self.station_data
+      #  if stationd==None: stationd = self.station_data
+        
+        
         #Does the swap of -9999 for np.nan
         returner = stationd.replace(-9999,np.nan) 
+
         
+        #CHeck if TAVG exists. if not, calculate it.
+        if ("TAVG" in returner.columns)!=True: 
+           if self.display : print("TAVG not present, I will create it.")
+           returner['TMID'] = (returner['TMAX']+returner['TMIN'])/2
+        #If it does exist, rename it to TMID, beacause TAVG is a milseading name.
+        if ("TAVG" in returner.columns)==True: 
+           if self.display : print("TAVG present, I will rename it to TMID.")
+           returner = returner.rename(columns ={'TAVG':"TMID"})
+
+        #Now, drop extraneous columns.
+        returner = returner[self.yaml['KEEP_COLS']]
+
+                    
         #Converting frmo tenths of degrees C to C.
-        returner.iloc[:,-31:] = returner.iloc[:,-31:]/10
+        threetemps=["TMAX",'TMIN',"TMID"]
+        returner[threetemps] = returner[threetemps]/10
         
         #Convert from Celsius to Farnehit
-        returner.iloc[:,-31:] = (returner.iloc[:,-31:]*9/5)+32
+        returner[threetemps] = (returner[threetemps]*9/5)+32
         
+        #Create dates columns appropriately.
+        returner['Year']=returner['DATE'].str[:4]
+        returner['Month']=returner['DATE'].str[5:7]
+        returner['Day']=returner['DATE'].str[8:10]
+        
+        returner['Year']=pd.to_numeric(returner.Year)
+        returner['Month']=pd.to_numeric(returner.Month)
+        returner['Day']=pd.to_numeric(returner.Day)
+        
+        
+        returner = returner.drop(['DATE'],axis=1)
+        
+        #Re-order them.
+        returner1=returner.reindex(columns=['Year','Month','Day','TMAX','TMIN',"TMID"])
+        #Change to numpy.
+        returner1 = np.asarray(returner1)
+        return returner1
+        """
         #Sort values. 
         returner=returner.sort_values(by=['Year','Month'])
         
@@ -368,5 +434,5 @@ class LoadStation :
             print("Time taken to create TMID using NUMPY " + str(executionTime))
         
         return returner1
-    
+    """
               

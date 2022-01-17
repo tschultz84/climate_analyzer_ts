@@ -12,7 +12,7 @@ import Station_analyzer_ts as analyze
 
 
 #%%
-bzdata=load.LoadStation([45.647256643331126,-111.04060494981753],10,True,True) #Loading in Bozeman, MT coordinates
+bzdata=load.LoadStation([45.647256643331126,-111.04060494981753],True) #Loading in Bozeman, MT coordinates
 
 #%%
 
@@ -46,7 +46,7 @@ sdcalc=analyze.StationAnalyzer(sddata.station_data_clean)
 
 #%%
 
-dvtdata=load.LoadStation([32.659167, -116.099167],10,True,True) #Loading in Desert View Tower data
+dvtdata=load.LoadStation([32.659167, -116.099167],True) #Loading in Desert View Tower data
 #%%
 date1 = '2000-1-1'
 date2 = '2020-12-31'
@@ -58,6 +58,13 @@ dvtcalc=analyze.StationAnalyzer(dvtdata.station_data_clean,date1,date2,display=T
 #
 
 #%%
+stat='CA006048K6J'
+test = load.LoadStation(stat,True)
+#%%
+date1 = '2010-1-1'
+date2 = '2020-12-1'
+test1=analyze.StationAnalyzer(test.station_data,date1,date2,display=True)
+
 
 
 

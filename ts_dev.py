@@ -27,3 +27,18 @@ def find_doy(pddate):
 print(find_doy(start))
 
 #%%
+# String with URL:
+url_dir = 'https://www.ncei.noaa.gov/data/global-historical-climatology-network-daily/access/'
+url_name = 'ACW00011604.csv'
+columns=['DATE',"TMAX","TMIN","TAVG"]
+# First example to read csv from URL
+#df = pd.read_csv(yaml['NOAA_URL']+url_name,usecols=columns)
+df = pd.read_csv(yaml['NOAA_URL']+url_name,usecols=columns)
+#df.columns()
+#%%
+import requests
+response = requests.get(url_dir+'XXX')
+#%%
+yaml_dir="C:\\Users\\14154\\OneDrive\\Python\\climate_mapper\\python\\climate_analyzer_ts\\"
+yaml_file = open(yaml_dir+"load_stats_static.yaml")
+yaml = yaml.load(yaml_file, Loader=yaml.FullLoader)

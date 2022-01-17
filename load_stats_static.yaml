@@ -22,6 +22,9 @@
 
 #STATIONMETA is the file containing all the lat / lon information for the stations.
     STATIONMETA : "C:\\ts_big_data_files\\ghcnd_station_master_ts_tmax.csv"
+    
+#NOAA_URL is the url to the directory containing the DLY files. 
+    NOAA_URL : 'https://www.ncei.noaa.gov/data/global-historical-climatology-network-daily/access/'
 
 #==============
 #HARDCODED PARAMETERS
@@ -58,6 +61,11 @@
     TMIN_INDEX : 0
     TMAX_INDEX : 1
     TMID_INDEX : 2
+
+#=============
+#REQUIRED SPECIFICS TO LEAD CSV FILES FROM NOAA WEBSITE
+    #Columns to keep from CSV files.
+    KEEP_COLS : ['DATE','TMAX','TMIN','TMID']
 
 #=============
 #REQUIRED SPECIFICTIONS TO LOAD .DLY FILES

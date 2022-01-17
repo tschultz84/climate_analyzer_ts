@@ -36,9 +36,12 @@ class StationAnalyzer :
         #Creating the assigned value containing every single element. 
         self.all_data_long=stationdata
         #Then assining off TMID, TMIN, and TMAX. 
-        self.tmid_array = self.all_data_long[np.where(self.all_data_long[:,5]==self.yaml['TMID_INDEX'])][:,:5]
-        self.tmin_array = self.all_data_long[np.where(self.all_data_long[:,5]==self.yaml['TMIN_INDEX'])][:,:5]
-        self.tmax_array = self.all_data_long[np.where(self.all_data_long[:,5]==self.yaml['TMAX_INDEX'])][:,:5]
+        #self.tmid_array = self.all_data_long[np.where(self.all_data_long[:,5]==self.yaml['TMID_INDEX'])][:,:5]
+        #self.tmin_array = self.all_data_long[np.where(self.all_data_long[:,5]==self.yaml['TMIN_INDEX'])][:,:5]
+        #self.tmax_array = self.all_data_long[np.where(self.all_data_long[:,5]==self.yaml['TMAX_INDEX'])][:,:5]
+        self.tmid_array = self.all_data_long[:,[0,1,2,3]]
+        self.tmin_array = self.all_data_long[:,[0,1,2,4]]
+        self.tmax_array = self.all_data_long[:,[0,1,2,5]]
         
         #This then creates the yearly averages.
         #First, find the beginning and end years, and the number of years total.
