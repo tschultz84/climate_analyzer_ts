@@ -34,7 +34,8 @@ and the specific station ID is instead searched for.
     #self.name_closest_st gives its name
     #self.miles_from_closest_st gives its distance
     #self.closest_stations gives a list of the  nearest stations
-    self.station_data is a dataframe ahving loaded all the statin's data. '
+    self.station_data is a dataframe ahving loaded all the statin's data, a numpy array 
+     with these columns: [Year, Month, Day, Day of Year, TMAX, TMIN, TMID]
 """    
 class LoadStation :
     def __init__(self,point,printudpate=False):
@@ -42,7 +43,7 @@ class LoadStation :
         self.display=  printudpate   
         #If a point (lat, lon) is passed, then create a point. 
         if (type(point) != str) and (len(point)==2):
-            self.refpoint=Point(point[1],point[0])
+            self.refpoint=point
         
         #This YAML file contains a great deal of static information, 
         #such as directory information. 
@@ -111,17 +112,18 @@ class LoadStation :
        #from 1.2 seconds when searching all 40,000 rows with TMAX,
        #to 0.1 seconds, when searching within 0.25 lat /lon degrees
        bar=self.yaml['SEARCH_RADIUS']
-       df=df[df['Longitude']>pt.x-bar]
-       df=df[df['Longitude']<pt.x+bar]
-       df=df[df['Latitude']>pt.y-bar]
-       df=df[df['Latitude']<pt.y+bar]
+       df=df[df['Longitude']>point[1]-bar]
+       df=df[df['Longitude']<point[1]+bar]
+       df=df[df['Latitude']>point[0]-bar]
+       df=df[df['Latitude']<point[0]+bar]
 
         #Prints th enumber of stations being searched.
        if self.display: 
            print("Searching closest station among "
                               +str(len(df))+" stations within "+str(self.yaml['SEARCH_RADIUS'])+" degrees of the reference.")
            print("This only includes stations with data available more recently than "+str(recentyear)+" and before "+str(self.yaml['BASEYEAR']))
-       #This then transforms the initial data series into a GeoSeries of points   
+       """
+        #This then transforms the initial data series into a GeoSeries of points   
        t1=gpd.GeoSeries(gpd.points_from_xy(df.Longitude, df.Latitude))
        #Then evaluates the distance between pt and each entry in the data series
        t1= t1.distance(pt)
@@ -132,17 +134,18 @@ class LoadStation :
        #this is relevant because the distance, calculated above as cartesian distance using lat/lon,
        #is not accurate, and the distance in miles may very enough to change which stations are closest
        otw=df.iloc[t2.index[0:40]]
-       
+       """
        #This creates a dataseries which calculates the distancef rom the ref "pt"
        #to all of the nearest 20 stations.
        d1er=[]
-       for i in range(0,len(otw)):
-           d1er.append(self.ts_latlon_distance([pt.y,pt.x],otw.iloc[i][['Latitude','Longitude']]))
-          
+       for i in range(0,len(df)):
+           d1er.append(self.ts_latlon_distance([point[0],point[1]],df.iloc[i][['Latitude','Longitude']]))
+       
        #This appends the data series to the final return dataframe
-       otw['Miles_from_Ref']=d1er
-       #and then sorts by miles from ref, to find the closest stations
-       returner=otw.sort_values(by='Miles_from_Ref')
+       df['Miles_from_Ref']=d1er
+       
+       #and then sorts by miles from ref, to find the closest stations       
+       returner=df.sort_values(by='Miles_from_Ref')
        
        #Then return the closest 10 stations.
        returner=returner[0:10]
@@ -158,8 +161,8 @@ class LoadStation :
        refdf= pd.DataFrame(
            {'ID':['REFPT'],
             'Name':["Reference Location"],
-            'Latitude':[pt.y],
-            'Longitude':[pt.x],
+            'Latitude':[point[0]],
+            'Longitude':[point[1]],
             'Miles_from_Ref':[0]}
            )
        
@@ -262,22 +265,22 @@ class LoadStation :
         
         return inter0
  
-    
+    #This function finds the Day of year, assuming every month has 31 days
+    #taking in the day of month (dom) and month.
+    def find_doy(self,dom,month):
+        doy = dom+(month-1)*31
+        return doy
     """
       This takes in data for single weather station - in the format of output from
       load_station
       and cleans it up. 
-      The only input is stationd, which, if =None, just defaults to using data frmo
-      self.station_data
-      Currently these cleaning operations are completed:
-          *Change -9999 values to np.nan
+      The only input is stationd, which must be in the format of self.station_data
+     It returns a numpy array version, where each row contains:
+         Year, Month, Day, Day of Year, TMAX, TMIN, TMID
     """
     def StationDataCleaner(self,stationd):
-        #If station=d is none, just default to using self.station_data
-      #  if stationd==None: stationd = self.station_data
-        
-        
-        #Does the swap of -9999 for np.nan
+       
+        #Does the swap of -9999 for np.nan (I am not sure this is relevant for CSV)
         returner = stationd.replace(-9999,np.nan) 
 
         
@@ -310,11 +313,12 @@ class LoadStation :
         returner['Month']=pd.to_numeric(returner.Month)
         returner['Day']=pd.to_numeric(returner.Day)
         
+        returner['DOY'] = self.find_doy(returner['Day'],returner['Month'])
         
         returner = returner.drop(['DATE'],axis=1)
         
         #Re-order them.
-        returner1=returner.reindex(columns=['Year','Month','Day','TMAX','TMIN',"TMID"])
+        returner1=returner.reindex(columns=['Year','Month','Day','DOY','TMAX','TMIN',"TMID"])
         #Change to numpy.
         returner1 = np.asarray(returner1)
         return returner1
