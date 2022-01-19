@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
-import shapely
-from shapely.geometry import Point,MultiPoint,Polygon
-from shapely.ops import nearest_points
-import geopandas as gpd
+#import shapely
+#from shapely.geometry import Point,MultiPoint,Polygon
+#from shapely.ops import nearest_points
+#import geopandas as gpd
 import pandas as pd
 from math import radians, cos, sin, asin, sqrt
 import time
@@ -20,11 +20,8 @@ import requests
 This object has functions to identify the station nearest to a reference lat, lon.
 The inputs are as follows:
 *point is a list, in the form [latitude,longitude], which is the reference point
-(data will be lodded for the station closest to these coordinations, unless stid is not None)
-
-*stid is a manually entered station. If stid is not None, then point is overriden, 
-and the specific station ID is instead searched for. 
-#autorun runs all the functions automatically. 
+(data will be lodded for the station closest to these coordinates where enough data
+ is available.)
 *printupdate, is only used to display status updates for the script
 #If false, no updates are printed
 
@@ -50,45 +47,60 @@ class LoadStation :
         yaml_dir="C:\\Users\\14154\\OneDrive\\Python\\climate_mapper\\python\\climate_analyzer_ts\\"
         yaml_file = open(yaml_dir+"load_stats_static.yaml")
         self.yaml = yaml.load(yaml_file, Loader=yaml.FullLoader)
-        """
-        The following few lines automatically run all the functions at initiation.
-        """
-        if self.display: startTime = time.time() 
-        #If point is a string, you skip finding any station, and go righ o the loader. 
-        if type(point) == str:
-            self.station_data=self.load_station(point)
         
-        #If point is not a string, but a point, run the function to find
-        #the nearest station.     
-        if type(point) != str:    
-            self.closest_stations = self.nearest_station(point)
-            if(self.display): 
-                print("Time to locate nearest weather stations:" + str(time.time() - startTime))
-                startTime = time.time() 
-            self.station_data=self.load_station(self.id_closest_st)
+        #First, the list of stations is generated.
+        self.closest_stations = self.nearest_station(point)
+      
+        #Now, the station data is all loaded up.
+        # add a flag variable
+        keep_going = True
+        for i in np.arange(1,len(self.closest_stations)):
+            if keep_going == True:
+                self.run_this_baby(self.closest_stations.iloc[i,0])
+                #A check is performed tos ee if the data is compelte.
+                isgood = self.StationDataCheck(self.station_data)
+                if isgood == True:
+                    #Set flag to stop the loop, if the data is good.
+                    keep_going=False
+                    self.name_closest_station=self.closest_stations.iloc[i][1] 
+                    self.miles_from_ref = self.closest_stations.iloc[i][4]
+                    if self.display: 
+                        
+                        print("Station ID# "+str(self.closest_stations.iloc[i,0])+", "+str(self.name_closest_station)+" is complete. It's good to use.")
+                        print("This station is "+str(self.miles_from_ref)+" miles from the reference point.")
+                        
+                
+                #If it's not, we report that. ANd keep the flag TRue to keep goign. 
+                if isgood == False:
+                    keep_going=True
+                    if self.display: 
+                        print("Station ID# "+str(self.closest_stations.iloc[i,0])+", called "+str(self.closest_stations.iloc[i][1] )+" is incomplete. Don't use it.")
+                  
+    #This funtion runs all functions.
+    def run_this_baby(self,point):
+        if self.display: startTime = time.time() 
+      
+        self.station_data=self.load_station(point)
         if(self.display): 
             print("Time to load this station data:" + str(time.time() - startTime))
             startTime = time.time() 
         
         self.station_data=self.StationDataCleaner(self.station_data)
-        
+                
         if(self.display): 
             print("Time to clean up this data:" + str(time.time() - startTime))
+            
     """    
     #This function as a default takes the LoadStation object's
     #reference point of interest and searches for the nearest point in our list of points,
     #searching distance by miles distance
-    #It returns a list of the nearest stations, ordered
+    #It returns a list of the nearest stations, ordered by distance.
     #This is returned in the foramt of a dataframe.
     #The first row of the returned dataframe is the reference point. 
-    The input 'num' is the number of closest stations returned
-    
+
     """
     def nearest_station(self,point):
        pt=point
-       
-       #DATAPATH is just where ghcnd-stations and ghcnd-inventory are located on your hard drive.
-       #stDATAPATH = "C:\\ts_big_data_files\\"
        #This initializes the actual data to search, from the list of stations
        #It only reads in the columns which are necessary to search by distance. 
        #It also searches only for the TMAX values. 
@@ -104,8 +116,7 @@ class LoadStation :
        
        #Now drops the year info, since we don't need it.
        df=df[['ID','Name','Latitude','Longitude']]
-           
-       
+               
        #This steps strips out lat and lon values that are not nearby, reducing the number
        #of distance computations required.
        #Using this limiter reduced the time to run this script by an entire second,
@@ -122,21 +133,9 @@ class LoadStation :
            print("Searching closest station among "
                               +str(len(df))+" stations within "+str(self.yaml['SEARCH_RADIUS'])+" degrees of the reference.")
            print("This only includes stations with data available more recently than "+str(recentyear)+" and before "+str(self.yaml['BASEYEAR']))
-       """
-        #This then transforms the initial data series into a GeoSeries of points   
-       t1=gpd.GeoSeries(gpd.points_from_xy(df.Longitude, df.Latitude))
-       #Then evaluates the distance between pt and each entry in the data series
-       t1= t1.distance(pt)
-       #Then sorts all distances, to find closest
-       t2=t1.sort_values()
-       #And selects the closest values
-       #4*num are selected, since in the next stage, we re-sort by actual distance (miles)
-       #this is relevant because the distance, calculated above as cartesian distance using lat/lon,
-       #is not accurate, and the distance in miles may very enough to change which stations are closest
-       otw=df.iloc[t2.index[0:40]]
-       """
+       
        #This creates a dataseries which calculates the distancef rom the ref "pt"
-       #to all of the nearest 20 stations.
+       #to all of the nearest stations.
        d1er=[]
        for i in range(0,len(df)):
            d1er.append(self.ts_latlon_distance([point[0],point[1]],df.iloc[i][['Latitude','Longitude']]))
@@ -147,8 +146,8 @@ class LoadStation :
        #and then sorts by miles from ref, to find the closest stations       
        returner=df.sort_values(by='Miles_from_Ref')
        
-       #Then return the closest 10 stations.
-       returner=returner[0:10]
+       #Then return the closest 50 stations.
+       returner=returner[0:50]
        
        #This sets a variable which is the ID Of the nearest station
        self.id_closest_st = returner.iloc[0,0]
@@ -165,16 +164,9 @@ class LoadStation :
             'Longitude':[point[1]],
             'Miles_from_Ref':[0]}
            )
-       
-       
-
-       final = refdf.append(returner)
-       #Prints the output, if that is selected.
-       
-    
+       final = refdf.append(returner)   
        return final
     
-
     #This function returns the miles between two poitns
     #def ts_latlon_distance(lat1, lat2, lon1, lon2):
     def ts_latlon_distance(self,latlon1,latlon2):
@@ -182,18 +174,15 @@ class LoadStation :
         lon1 = radians(latlon1[1])
         lon2 = radians(latlon2[1])
         lat1 = radians(latlon1[0])
-        lat2 = radians(latlon2[0])
-        
+        lat2 = radians(latlon2[0])  
         # Haversine formula
         dlon = lon2 - lon1
         dlat = lat2 - lat1
-        a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
-     
+        a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2 
         c = 2 * asin(sqrt(a))
         
-        # Radius of earth in kilometers. Use 3956 for miles
-        r = 3956
-          
+        # Radius of earth in miles. Use 3956 for miles
+        r = 3956     
         # calculate the result, returned in miles
         return(c * r)
          
@@ -205,17 +194,7 @@ class LoadStation :
         #If statino is none, then defaults to the station closest to the ref point. 
         if station == None:
             station=self.id_closest_st
-        """
-        #This assigns the filename where station info is located.
-        filename=self.yaml['DATAPATH']+str(station)+'.dly'
-        
-        #This checks the file exists and breask if it does not.
-        #(If it doesn't exist, the submitted station ID was in error.)
-        if os.path.exists(filename) == False:
-            print("Bad Station ID. The file called "+filename+" does not exist.")
-            print("Please check your station ID "+str(station)+" and re-submit.")
-            sys.exit("Break Error in load_station of StationReader: Bad Station ID.")
-        """
+       
         #Downloading the CSV file straight rom NOAA.
         #First, assigning the URL Name.
         csv_url = self.yaml['NOAA_URL']+str(station)+'.csv'
@@ -228,41 +207,12 @@ class LoadStation :
         #Then, checking i it exists. the script breaks if the file does not exist.
         response = requests.get(csv_url)
         if response.status_code!= 200:
-            
             print("Bad Station ID. The file called "+csv_url+" does not exist.")
             print("Please check your station ID "+str(station)+" and re-submit.")
             sys.exit("Break Error in load_station of StationReader: Bad Station ID.")
-        #Then, downloads the file. 
-        inter0 = pd.read_csv(csv_url)
-        """
-        #You have designed this script so it only reads in the lines where data is useful
-        #and excludes other elements. 
-        #When testing reading in the very largest data file, you would typically save
-        #0.02 to 0.06 seconds during loading. Worth every bit...
         
-        #This defines the pre-loading data, i.e. which columns are used to skip rows.
-        shortcols = [ (17, 21)]
-        shortnames =  np.array([ 'Element'])
-        
-        #This then reads the file, but only the columns which generate the rows to skip. 
-        prelim = pd.DataFrame()    
-        prelim=pd.read_fwf(filename,colspecs=shortcols)
-        prelim.columns=shortnames
-        #This generates the rows to skip.   
-        #Currently you are keeping only TMAX and TMIN
-        tokeep=['TMAX','TMIN','TAVG']
-        skiprows1 = prelim[(~prelim['Element'].isin(tokeep))].index
-        
-        
-        #Then, the data is read in.
-        inter0 = pd.DataFrame()      
-        #This then Reads out the next file.  
-        inter0 = pd.read_fwf(filename,colspecs=self.yaml['datacolnums'],skiprows=skiprows1+1)
-        """
-
-        #This is a dataframe of all the data.
-        #self.station_data=inter0
-        
+        #Then, downloads the file and returns it. 
+        inter0 = pd.read_csv(csv_url)            
         return inter0
  
     #This function finds the Day of year, assuming every month has 31 days
@@ -272,8 +222,7 @@ class LoadStation :
         return doy
     """
       This takes in data for single weather station - in the format of output from
-      load_station
-      and cleans it up. 
+      load_station and cleans it up. 
       The only input is stationd, which must be in the format of self.station_data
      It returns a numpy array version, where each row contains:
          Year, Month, Day, Day of Year, TMAX, TMIN, TMID
@@ -282,20 +231,14 @@ class LoadStation :
        
         #Does the swap of -9999 for np.nan (I am not sure this is relevant for CSV)
         returner = stationd.replace(-9999,np.nan) 
-
         
-        #CHeck if TAVG exists. if not, calculate it.
-        if ("TAVG" in returner.columns)!=True: 
-           if self.display : print("TAVG not present, I will create it.")
-           returner['TMID'] = (returner['TMAX']+returner['TMIN'])/2
-        #If it does exist, rename it to TMID, beacause TAVG is a milseading name.
-        if ("TAVG" in returner.columns)==True: 
-           if self.display : print("TAVG present, I will rename it to TMID.")
-           returner = returner.rename(columns ={'TAVG':"TMID"})
-
+        #Calculate TMID.
+        #Note that you cna't just load TAVG.
+        #EVen if it exists, it is often incomplete.
+        returner['TMID'] = (returner['TMAX']+returner['TMIN'])/2
+        
         #Now, drop extraneous columns.
         returner = returner[self.yaml['KEEP_COLS']]
-
                     
         #Converting frmo tenths of degrees C to C.
         threetemps=["TMAX",'TMIN',"TMID"]
@@ -312,131 +255,111 @@ class LoadStation :
         returner['Year']=pd.to_numeric(returner.Year)
         returner['Month']=pd.to_numeric(returner.Month)
         returner['Day']=pd.to_numeric(returner.Day)
-        
+        #Creates a column for the DAy of the Year.
         returner['DOY'] = self.find_doy(returner['Day'],returner['Month'])
-        
+        #Removes the DATE column, which is now redudant.
         returner = returner.drop(['DATE'],axis=1)
         
-        #Re-order them.
+        #Re-order the columns for cleanliness.
         returner1=returner.reindex(columns=['Year','Month','Day','DOY','TMAX','TMIN',"TMID"])
         #Change to numpy.
         returner1 = np.asarray(returner1)
-        return returner1
-        """
-        #Sort values. 
-        returner=returner.sort_values(by=['Year','Month'])
         
-        #TURN 31 COLUMN ENTRIES, ONE FOR EVERY DAY OF YEAR, TO ONE LONG MATRIX
-        #You may consider moving this into the station_data object. 
-        #This allows you to number each day of the year.
-        #Making it much easier to serach by days. 
-        all_data=np.asarray(returner.drop(['Station_ID'],axis=1))
-        self.all_data_1=all_data
-        #return returner
-        #You need to drop all years without 12 months of data.
-        #That screws up your calculations
-        #and will also bias results. 
-        
-        inter1=np.empty((len(all_data)*31,6))
-        #inter1=np.asarray(inter1,dtype=dtyper)
-        tot=0
-    
-        #Loop over entire length of the dataset. 
-        for k in np.arange(0,len(all_data)):
-            #Pull out the year, month, and then monthdata, for every row.
-            year=all_data[k,0]
-            month=all_data[k,1]
-            monthdata=np.transpose(all_data[k,3:])
-            #Turning the elemnt value into a number, which is easier to work with
-            #in numpy (and faster)
-            #The integer values are arbitrary. 
-            ele = all_data[k,2]
-            eler=-1
-            if(ele == "TMIN"):
-                eler=self.yaml['TMIN_INDEX']
-            if(ele == "TMAX"):
-                eler=self.yaml['TMAX_INDEX']
-           # if(ele == "TMID"):
-           #     eler=2
+        #THESE STEPS SCRUB OUT ALL YEARS WHERE THERE IS INSUFFICIENT DATA.
+        #First, list out the unique years.
+        uniqueyears = np.unique(returner1[:,0])
+        #This defines the minimum number of days of data which msut be present in eveyr month
+        #for the year to be included.
+        min_days=self.yaml['MIN_DAYS_PER_MO']
 
-            #Then loop over each month, creating a enw row for every single element. 
-            for i in np.arange(1,32):
-                #Assign the Day of Year, which goes to more than 365 (31 * 12)
-                doy = i + (month-1)*31
-                
-                #Then assigning each column value. 
-                inter1[tot,0]=year
-                inter1[tot,1]=month
-                inter1[tot,2]=i
-                inter1[tot,3]=doy
-                inter1[tot,5]=eler
-                inter1[tot,4]=monthdata[i-1]  
-                tot=tot+1
-        
-        #This then calculates TMEAN values. 
-        returner = self.calculate_tmid(inter1)
-        self.all_data_np=returner
-        return returner
-    
-    #Calculates TMID. 
-    #Station d must be in the format of self.all_data_np. 
-    def calculate_tmid(self,stationd):
-        if self.display==True: startTime = time.time()
-        
-        #Breaks apart the TMAX and TMIN values. 
-        tmax=stationd[np.where(stationd[:,5]==self.yaml["TMAX_INDEX"])]
-        tmin=stationd[np.where(stationd[:,5]==self.yaml["TMIN_INDEX"])]
+        showme = self.display
 
-        #THen loops over every entry, finds the mtaching dates int he other array,
-        #then, if they are teh same, adds it to the returned array.
-        
-        outer= []
-        for i in np.arange(0,len(tmax)):
-            year=tmax[i,0]
-            doy = tmax[i,3]
-            index = np.where((tmin[:,0]==year)&(tmin[:,3]==doy))
-            if np.shape(index)[1]>0:
-                tminval = tmin[index,4][0][0]
-                outer.append([tmax[i,0],tmax[i,1],tmax[i,2],tmax[i,3],tmax[i,4],tminval])
-        
-        outer=np.asarray(outer)
-        #Evaluates the means. 
-        means = np.nanmean(np.array([outer[:,4],outer[:,5]]),axis=0)
-        #Grabs the dates. 
-        dates=outer[:,0:4]
-        #Then combines verything into a single matrix to be returned. 
-        returner1 = np.insert(dates,4,means,axis=1)
-        returner1=np.insert(returner1,5,self.yaml['TMID_INDEX'],axis=1) 
-        
-        #These steps then scrub out any years in TMID day which
-        #do not include 12 months of data
-        #This is improtant, since if there are not all moths included
-        #It would bias results like yearly averages.
-        #First, assign a new variable, tmidex, to be ecleaned up.
-        tmidex=returner1
-        
-        wheres = []
-        #This loops over all of the unique years in the dataset.
-        uniqueyears=np.unique(tmidex[:,0])
-        for i in uniqueyears:
-            #First, finds the index values where the year is equal to year i.
-            index=np.where(tmidex[:,0]==i)
-            #Then, finds the unique months for this year, which shoudl be1 through 12.
-            months=np.unique(tmidex[index][:,1])
-            if len(months) ==12:
-                    #Only if the year has 12 months, is the year included in the final dataset. 
-                 wheres.append(index)
-        wheres = np.asarray(wheres).flatten()
-        tmidex1 = tmidex[wheres]
-        
-        #This ten combines the TMID, TMAX, and TMIN, into one big matrix. 
-        returner1=np.append(tmidex,tmax,axis=0)
-        #returner1=np.append(tmidex1,tmax,axis=0)
-        returner1=np.append(returner1,tmin,axis=0)
-        if self.display==True: 
-            executionTime = (time.time() - startTime)
-            print("Time taken to create TMID using NUMPY " + str(executionTime))
+        #This initializes the "to keep" list -- the list of data to be included.
+        tokeep = np.empty([0,1],dtype=int)
+        #Loop oer all years.
+        for year in uniqueyears:
+            #As a default, the year is not returned. This flag therefore starts as FALSE.
+            return_this_year = False    
+            #Select only the index values wehre the year is equal to year.
+            index=np.where(returner1[:,0]==year)
+            #Then, selects data for this year
+            #All columns are included.
+            yearsubset=returner1[index]
+            
+            #Finding all unique months in this year.
+            uniquemonths = np.unique(yearsubset[:,1])
+            #Coutns the number of months.
+            norows = len(uniquemonths)
+            #Print an update, if the year is removed.
+            if (showme) and (norows < 12) and (year != uniqueyears[-1]):
+                print("I dropped "+str(year)+" for having only "+str(norows)+" months of data.")
+            #Checks that 12 months are actually present in the data.
+            if norows == 12:
+                #This becomes True for now ,but becomes false if there are insufficeitn days
+                #in any one month.
+                return_this_year=True
+                #Then, checks there are adequate data in each month for this year.
+                for month in uniquemonths:
+                    #Creates a list jsut including tehse months. 
+                    monthssubset = yearsubset[np.where(yearsubset[:,1]==month)]
+                    #Finds all numbered values.
+                    listoftmax = ~np.isnan(monthssubset[:,4])
+                    listoftmin = ~np.isnan(monthssubset[:,5])
+                    listoftmid = ~np.isnan(monthssubset[:,6])
+                    #Counts the number of numbers. 
+                    tmax_number = np.count_nonzero(listoftmax)
+                    tmin_number = np.count_nonzero(listoftmax)
+                    tmid_number = np.count_nonzero(listoftmax)
+                    #Then checks if each is over the require dminium.
+                    #Every data point must be present at the right threshold.
+                    tmax_enough = (tmax_number >= min_days)
+                    tmin_enough = (tmax_number >= min_days)
+                    tmid_enough = (tmax_number >= min_days)
+                    #If any condition is false -- there are not enough TMID, TMAX, or TMIN
+                    #values in the month - then the whole year is dropped out.
+                    if (tmax_enough == False) or (tmin_enough==False) or (tmid_enough ==False):
+                        return_this_year = False
+                        if showme: print("I dropped "+str(year)+" for having less than "+str(min_days)+" days in month #"+str(month))
+            #Only if return_this_year, the flag field, is True, is the year added.
+            #there is only one exception: the most recent year, which definitionally
+            #will not have a complete reord of data, which is OK.
+            if (return_this_year ==True) or (year == uniqueyears[-1]):
+                #If everything is true; then add it to the list of rows to keep. 
+                tokeep=np.append(tokeep,index)
+        #Filter to just the years meeting all the conditions above.
+        returner1 =returner1[tokeep]          
         
         return returner1
-    """
+    
+    #This function reviews the station data and checks that it is complete,.
+    #using a few common-sense checks.    
+    def StationDataCheck(self,stationd):
+        if self.display: 
+            print("-------------------------------------")
+            print("Checking the completeness of the data.")
+        #List unique years in the dataset.
+        listyears = np.unique(stationd[:,0])
+        #This is a flag field which defaults to TRue, but remains true
+        #only if the dataset pasess al checks.
+        itsgood=True
+        thisyear = date.today().year
+        #Check the latest year is present.
+        if (listyears[-1]!=thisyear):
+            itsgood = False
+            if self.display: print("Flag: The current year ("+str(thisyear)+") is not present.")
+        #Then, check if there are sufficient years in the recent trend.
+        no_recent = np.shape(np.where(listyears>=thisyear-31))[1]
+        if no_recent <= self.yaml['REQUIRED_TREND_YEARS']:
+            itsgood = False
+            if self.display: 
+                print("Flag: Insufficent years to calculate recent trend.") 
+                print("I need more than "+str(self.yaml['REQUIRED_TREND_YEARS'])+" years to calculate a trend, but only "+str(no_recent)+" available.")
+        #Then, that there are enough years to calculate a baseline.
+        no_early = np.shape(np.where(listyears<=self.yaml['BASEYEAR']))[1]
+        if no_early <= self.yaml['BASENOYEARS']:
+            itsgood = False
+            if self.display: 
+                print("Flag: Insufficent years before "+str(self.yaml['BASEYEAR'])+" to calculate mean.")
+                print ("There are "+str(no_early)+" years in this period, I need at least "+str(self.yaml['BASENOYEARS'])+" to set an accurate baseline.")
+        return itsgood
               

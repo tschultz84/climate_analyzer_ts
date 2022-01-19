@@ -53,25 +53,51 @@ class StationAnalyzer :
         self.refststr=refst
         self.refendst=refend
         
-        #Creating the arrayed reference period. 
-        self.refperiod=self.find_ref_range(refst,refend)
-        #creates baseline range.
-        self.baseperiod=self.find_baseline_range()
         
-        #Creatse the actual values of TMID in the periods.
-        self.tmid_ref_data=self.tmid_selection(self.refperiod)
-        self.tmid_base_data=self.tmid_selection(self.baseperiod)
         
         #This creates an array with mean of all years. 
         yearsout=np.empty([0,2])
-        for year in np.arange(self.alltime_startyear,self.alltime_endyear+1):
-                 
+        uniqueyears=np.unique(self.tmid_array[:,0])
+        for year in uniqueyears[:-1]:
+            #return_this_year = False    
             #Select only the index values wehre the year is equal to year.
             index=np.where(self.tmid_array[:,0]==year)
             #Then, selects data for this year
             #All columns are pulled, since we have to filter to ensure ther eare 
             #12 months for every year evaluated. 
             all_years_data=self.tmid_array[index]
+            
+            #Removing years without 12 months of data.
+            #And evaluates their mean. 
+            all_years_means=np.nanmean(all_years_data[:,4])
+            row=np.array([year,all_years_means])
+            yearsout=np.append(yearsout,[row],axis=0)
+           #for k in uniqueyears:
+            """
+            uniquemonths = np.unique(all_years_data[:,1])
+            norows = len(uniquemonths)
+            #First, checks that 12 months are actualyl present in the data.
+            if norows == 12:
+                return_this_year=True
+                #Then, checks there are adequate data in each month for this year.
+                for i in uniquemonths:
+                    #Creates a list jsut including tehse months. 
+                    monthssubset = all_years_data[np.where(all_years_data[:,1]==i)]
+                    #Finds all NAN values.
+                    listofnans = np.isnan(monthssubset[:,4])
+                    #Counts the NAN values. 
+                    numberofnans = np.count_nonzero(listofnans)
+                    #If the numbe of NANS exeeds what is allowed, then don't return this year.
+                    if numberofnans > self.yaml['MAX_MISSING_DAYS_PER_MONTH']:
+                        return_this_year = False
+            if return_this_year ==True:
+                
+                #And evaluates their mean. 
+                all_years_means=np.nanmean(all_years_data[:,4])
+                row=np.array([year,all_years_means])
+                yearsout=np.append(yearsout,[row],axis=0)
+                    
+           
             
             #The data is only written into the new numpy array, if
             #the number of months for the year is 12.
@@ -82,7 +108,16 @@ class StationAnalyzer :
                 all_years_means=np.nanmean(all_years_data[:,4])
                 row=np.array([year,all_years_means])
                 yearsout=np.append(yearsout,[row],axis=0)
+            """    
         self.all_years_mean=yearsout
+        #Creating the arrayed reference period. 
+        self.refperiod=self.find_ref_range(refst,refend)
+        #creates baseline range.
+        self.baseperiod=self.find_baseline_range()
+        
+        #Creatse the actual values of TMID in the periods.
+        self.tmid_ref_data=self.tmid_selection(self.refperiod)
+        self.tmid_base_data=self.tmid_selection(self.baseperiod)
         
         #This creates an array with mean of all months. 
         monthout=np.empty([12,2])
@@ -185,7 +220,7 @@ class StationAnalyzer :
         #Takes the unique days from the refperiod.
         baseline_doy = np.unique(self.refperiod[:,1])
         #Then, all the baseline years.
-        baseline_years = np.unique(self.tmid_array[:,0])
+        baseline_years = np.unique(self.all_years_mean[:,0])
         #and finally, limits it to the first set of baseline years.
         baseline_years=baseline_years[0:self.yaml['BASENOYEARS']]
         
@@ -195,7 +230,7 @@ class StationAnalyzer :
         #Creates a template. 
         returner = np.empty([0,2])
         #Loops over all unique years. 
-        for k in np.arange(np.min(baseline_years)+1,np.max(baseline_years)):
+        for k in np.arange(np.min(baseline_years),np.max(baseline_years)):
             #THen, creates each row element and appends it.             
             yearkarr = np.transpose(np.array([np.repeat(k,len(baseline_doy)),baseline_doy]))
             returner = np.append(returner,yearkarr,axis=0)
@@ -390,9 +425,13 @@ class StationAnalyzer :
         #This calculates the correlation coefficient and accompanying p-value
         #which states whether this correlation is statistically significant. 
         
-        years_index=~np.isnan(self.all_years_mean[:,1])
+        #years_index=~np.isnan(self.all_years_mean[:,1])
+        #First, format, and take only the recent years of data.
+        recentyears=self.yaml['RECENT_TREND_YEARS']
+        x5 = self.all_years_mean[-recentyears:,0]
+        y5 = self.all_years_mean[-recentyears:,1]
         
-        pearsond1 = pearsonr(self.all_years_mean[years_index,0],self.all_years_mean[years_index,1])
+        pearsond1 = pearsonr(x5,y5)
                 
         print("Outcome of Pearson Correlation Coefficient Analysis: ")
         print("Coefficient of Correlation (R): "+str(pearsond1[0]))
