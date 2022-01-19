@@ -36,9 +36,12 @@ class StationAnalyzer :
         #Creating the assigned value containing every single element. 
         self.all_data_long=stationdata
         #Then assining off TMID, TMIN, and TMAX. 
-        self.tmid_array = self.all_data_long[np.where(self.all_data_long[:,5]==self.yaml['TMID_INDEX'])][:,:5]
-        self.tmin_array = self.all_data_long[np.where(self.all_data_long[:,5]==self.yaml['TMIN_INDEX'])][:,:5]
-        self.tmax_array = self.all_data_long[np.where(self.all_data_long[:,5]==self.yaml['TMAX_INDEX'])][:,:5]
+        #self.tmid_array = self.all_data_long[np.where(self.all_data_long[:,5]==self.yaml['TMID_INDEX'])][:,:5]
+        #self.tmin_array = self.all_data_long[np.where(self.all_data_long[:,5]==self.yaml['TMIN_INDEX'])][:,:5]
+        #self.tmax_array = self.all_data_long[np.where(self.all_data_long[:,5]==self.yaml['TMAX_INDEX'])][:,:5]
+        self.tmid_array = self.all_data_long[:,[0,1,2,3,6]]
+        self.tmin_array = self.all_data_long[:,[0,1,2,3,5]]
+        self.tmax_array = self.all_data_long[:,[0,1,2,3,4]]
         
         #This then creates the yearly averages.
         #First, find the beginning and end years, and the number of years total.
@@ -50,25 +53,51 @@ class StationAnalyzer :
         self.refststr=refst
         self.refendst=refend
         
-        #Creating the arrayed reference period. 
-        self.refperiod=self.find_ref_range(refst,refend)
-        #creates baseline range.
-        self.baseperiod=self.find_baseline_range()
         
-        #Creatse the actual values of TMID in the periods.
-        self.tmid_ref_data=self.tmid_selection(self.refperiod)
-        self.tmid_base_data=self.tmid_selection(self.baseperiod)
         
         #This creates an array with mean of all years. 
         yearsout=np.empty([0,2])
-        for year in np.arange(self.alltime_startyear,self.alltime_endyear+1):
-                 
+        uniqueyears=np.unique(self.tmid_array[:,0])
+        for year in uniqueyears[:-1]:
+            #return_this_year = False    
             #Select only the index values wehre the year is equal to year.
             index=np.where(self.tmid_array[:,0]==year)
             #Then, selects data for this year
             #All columns are pulled, since we have to filter to ensure ther eare 
             #12 months for every year evaluated. 
             all_years_data=self.tmid_array[index]
+            
+            #Removing years without 12 months of data.
+            #And evaluates their mean. 
+            all_years_means=np.nanmean(all_years_data[:,4])
+            row=np.array([year,all_years_means])
+            yearsout=np.append(yearsout,[row],axis=0)
+           #for k in uniqueyears:
+            """
+            uniquemonths = np.unique(all_years_data[:,1])
+            norows = len(uniquemonths)
+            #First, checks that 12 months are actualyl present in the data.
+            if norows == 12:
+                return_this_year=True
+                #Then, checks there are adequate data in each month for this year.
+                for i in uniquemonths:
+                    #Creates a list jsut including tehse months. 
+                    monthssubset = all_years_data[np.where(all_years_data[:,1]==i)]
+                    #Finds all NAN values.
+                    listofnans = np.isnan(monthssubset[:,4])
+                    #Counts the NAN values. 
+                    numberofnans = np.count_nonzero(listofnans)
+                    #If the numbe of NANS exeeds what is allowed, then don't return this year.
+                    if numberofnans > self.yaml['MAX_MISSING_DAYS_PER_MONTH']:
+                        return_this_year = False
+            if return_this_year ==True:
+                
+                #And evaluates their mean. 
+                all_years_means=np.nanmean(all_years_data[:,4])
+                row=np.array([year,all_years_means])
+                yearsout=np.append(yearsout,[row],axis=0)
+                    
+           
             
             #The data is only written into the new numpy array, if
             #the number of months for the year is 12.
@@ -79,7 +108,16 @@ class StationAnalyzer :
                 all_years_means=np.nanmean(all_years_data[:,4])
                 row=np.array([year,all_years_means])
                 yearsout=np.append(yearsout,[row],axis=0)
+            """    
         self.all_years_mean=yearsout
+        #Creating the arrayed reference period. 
+        self.refperiod=self.find_ref_range(refst,refend)
+        #creates baseline range.
+        self.baseperiod=self.find_baseline_range()
+        
+        #Creatse the actual values of TMID in the periods.
+        self.tmid_ref_data=self.tmid_selection(self.refperiod)
+        self.tmid_base_data=self.tmid_selection(self.baseperiod)
         
         #This creates an array with mean of all months. 
         monthout=np.empty([12,2])
@@ -182,7 +220,7 @@ class StationAnalyzer :
         #Takes the unique days from the refperiod.
         baseline_doy = np.unique(self.refperiod[:,1])
         #Then, all the baseline years.
-        baseline_years = np.unique(self.tmid_array[:,0])
+        baseline_years = np.unique(self.all_years_mean[:,0])
         #and finally, limits it to the first set of baseline years.
         baseline_years=baseline_years[0:self.yaml['BASENOYEARS']]
         
@@ -192,7 +230,7 @@ class StationAnalyzer :
         #Creates a template. 
         returner = np.empty([0,2])
         #Loops over all unique years. 
-        for k in np.arange(np.min(baseline_years)+1,np.max(baseline_years)):
+        for k in np.arange(np.min(baseline_years),np.max(baseline_years)):
             #THen, creates each row element and appends it.             
             yearkarr = np.transpose(np.array([np.repeat(k,len(baseline_doy)),baseline_doy]))
             returner = np.append(returner,yearkarr,axis=0)
@@ -330,17 +368,33 @@ class StationAnalyzer :
             mindate.append(mindatestr)
      
         #This creates a dataframe of data points.
-        alltimestr1=str(self.tmid_array[0,0:3].astype(str))
-        alltimestr2=str(self.tmid_array[-1,0:3].astype(str))
+        #alltimestr1=str(self.tmid_array[0,0:3].astype(str))
+        #alltimestr2=str(self.tmid_array[-1,0:3].astype(str))
+        alltimestr1 = self.date_from_row(self.tmid_array[0])
+        alltimestr2 = self.date_from_row(self.tmid_array[-1])
+        
         basepd1=str(self.baseperiod[0,0:2].astype(str))
         basepd2=str(self.baseperiod[-1,0:2].astype(str))
+        
+        firstbaseyear = int(self.baseperiod[0,0])
+        lastbaseyear = int(self.baseperiod[-1,0])
+        basepdyears = str(firstbaseyear)+" to "+str(lastbaseyear)
+        basefirstyears = self.baseperiod[np.where(self.baseperiod[:,0]==firstbaseyear)]
+        #This needs to be adjusted- right now it onyl returns years in the baseline. 
+        #baspdmodays1 = str(int(basefirstyears[0,1]))+"-"+str(int(basefirstyears[0,2]))
+       # baspdmodays2 = str(int(basefirstyears[-1,1]))+"-"+str(int(basefirstyears[-1,2]))  
+       # basestr = baspdmodays1+" to "+baspdmodays2+" in "+basepdyears
+        basestr = basepdyears                                                     
+        
+        refstr1 = self.date_from_row(self.tmid_selection(self.refperiod)[0])
+        refstr2 = self.date_from_row(self.tmid_selection(self.refperiod)[-1])
         
         returner = pd.DataFrame(
             {
              "Period of Measure":
                  ["All Time:" +alltimestr1+" to "+alltimestr2,
-                 "Reference Period: "+self.refststr+" to "+self.refendst,
-                 "Baseline Period: "+basepd1+" to "+basepd2],
+                 "Reference Period: "+refstr1+" to "+refstr2,
+                 "Baseline Period: "+basestr],
                 "Average TMID over period (F)":[whole_tmid_mean,ref_tmid_mean,base_tmid_mean],
                 "Variance of TMID over period (F)":[whole_tmid_var,ref_tmid_var,base_tmid_var],
                 
@@ -370,7 +424,14 @@ class StationAnalyzer :
         print("The warming trend over the past "+str(self.yaml['RECENT_TREND_YEARS'])+" is: "+str(trend_data[0]*10)+" F degrees per decade.")
         #This calculates the correlation coefficient and accompanying p-value
         #which states whether this correlation is statistically significant. 
-        pearsond1 = pearsonr(self.all_years_mean[:,0],self.all_years_mean[:,1])
+        
+        #years_index=~np.isnan(self.all_years_mean[:,1])
+        #First, format, and take only the recent years of data.
+        recentyears=self.yaml['RECENT_TREND_YEARS']
+        x5 = self.all_years_mean[-recentyears:,0]
+        y5 = self.all_years_mean[-recentyears:,1]
+        
+        pearsond1 = pearsonr(x5,y5)
                 
         print("Outcome of Pearson Correlation Coefficient Analysis: ")
         print("Coefficient of Correlation (R): "+str(pearsond1[0]))
@@ -438,4 +499,14 @@ class StationAnalyzer :
         plt.text((refspan_min + refspan_max)/2,np.nanmin(self.all_years_mean[:,1]),'Reference',horizontalalignment='center')
         
         plt.show()
-                
+     #This takes a row from tmid_array, tmax_array, etc., and returns a formatted string.
+     #The excludeyear field excludes the year, which makes displaying the baseline period easier.
+    def date_from_row(self,row,excludeyear=False): 
+        year = str(int(row[0]))  
+        month = str(int(row[1]))
+        day = str(int(row[2]))
+        if excludeyear==False:
+            return year+"-"+month+"-"+day  
+        if excludeyear==True:
+            return month+"-"+day  
+        

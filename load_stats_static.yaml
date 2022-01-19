@@ -22,6 +22,9 @@
 
 #STATIONMETA is the file containing all the lat / lon information for the stations.
     STATIONMETA : "C:\\ts_big_data_files\\ghcnd_station_master_ts_tmax.csv"
+    
+#NOAA_URL is the url to the directory containing the DLY files. 
+    NOAA_URL : 'https://www.ncei.noaa.gov/data/global-historical-climatology-network-daily/access/'
 
 #==============
 #HARDCODED PARAMETERS
@@ -30,11 +33,19 @@
     BASEYEAR : 1970
     
     #BASENOYEARS is the number of years included in the baseline period. 
-    BASENOYEARS : 20
+    BASENOYEARS : 30
     
     #RECENT_TREND_YEARS is the number of years included (starting from the final year in the dataset).
     #in the annual temperature average trendline.  The linear trend is calculated only over this period.
-    RECENT_TREND_YEARS : 20
+    RECENT_TREND_YEARS : 30
+        
+    #REQUIRED_TREND_YEARS is minimum number of years required to calculate this trend.
+    REQUIRED_TREND_YEARS : 25
+    
+    #MIN_DAYS_PER_MO is the minimum number of dasys of data which must be present
+    #for every month of a year for a dataset to be included.
+    # If not, then the year is excluded from dataset.
+    MIN_DAYS_PER_MO : 20
     
     #ALPHA is the alpha value cmoparing TMID in the reference and baseline period. 
     #Basically if the P Value from the corresponding t-test exceeds this value,
@@ -58,6 +69,11 @@
     TMIN_INDEX : 0
     TMAX_INDEX : 1
     TMID_INDEX : 2
+
+#=============
+#REQUIRED SPECIFICS TO LEAD CSV FILES FROM NOAA WEBSITE
+    #Columns to keep from CSV files.
+    KEEP_COLS : ['DATE','TMAX','TMIN','TMID']
 
 #=============
 #REQUIRED SPECIFICTIONS TO LOAD .DLY FILES
