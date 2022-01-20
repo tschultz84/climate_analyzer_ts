@@ -40,24 +40,24 @@ obcalc=analyze.StationAnalyzer(obdata.station_data,date1,date2,display=True)
 #%%
 sddata=load.LoadStation([32.741947,-117.239571],True) #Loading in Ocean Beach, San Diego coordinates
 #%%
-date1 = '2020-1-1'
-date2 = '2020-12-31'
+date1 = '2021-1-1'
+date2 = '2021-12-31'
 sdcalc=analyze.StationAnalyzer(sddata.station_data,date1,date2,display=True)
 
 #%%
 
 dvtdata=load.LoadStation([32.659167, -116.099167],True) #Loading in Desert View Tower data
 #%%
-date1 = '2000-1-1'
-date2 = '2020-12-31'
+date1 = '2021-1-1'
+date2 = '2021-12-31'
 dvtcalc=analyze.StationAnalyzer(dvtdata.station_data,date1,date2,display=True)
 
 #%%
 
 atldata=load.LoadStation([33.6639, -84.428],True) #Loading in ATlanta GA data
 #%%
-date1 = '2000-1-1'
-date2 = '2020-12-31'
+date1 = '1984-1-1'
+date2 = '1984-12-31'
 atlcalc=analyze.StationAnalyzer(atldata.station_data,date1,date2,display=True)
 
 

@@ -67,48 +67,11 @@ class StationAnalyzer :
             #12 months for every year evaluated. 
             all_years_data=self.tmid_array[index]
             
-            #Removing years without 12 months of data.
-            #And evaluates their mean. 
+            #And then evaluates their mean. 
             all_years_means=np.nanmean(all_years_data[:,4])
             row=np.array([year,all_years_means])
             yearsout=np.append(yearsout,[row],axis=0)
-           #for k in uniqueyears:
-            """
-            uniquemonths = np.unique(all_years_data[:,1])
-            norows = len(uniquemonths)
-            #First, checks that 12 months are actualyl present in the data.
-            if norows == 12:
-                return_this_year=True
-                #Then, checks there are adequate data in each month for this year.
-                for i in uniquemonths:
-                    #Creates a list jsut including tehse months. 
-                    monthssubset = all_years_data[np.where(all_years_data[:,1]==i)]
-                    #Finds all NAN values.
-                    listofnans = np.isnan(monthssubset[:,4])
-                    #Counts the NAN values. 
-                    numberofnans = np.count_nonzero(listofnans)
-                    #If the numbe of NANS exeeds what is allowed, then don't return this year.
-                    if numberofnans > self.yaml['MAX_MISSING_DAYS_PER_MONTH']:
-                        return_this_year = False
-            if return_this_year ==True:
-                
-                #And evaluates their mean. 
-                all_years_means=np.nanmean(all_years_data[:,4])
-                row=np.array([year,all_years_means])
-                yearsout=np.append(yearsout,[row],axis=0)
-                    
-           
-            
-            #The data is only written into the new numpy array, if
-            #the number of months for the year is 12.
-            #This is evaluate dby counting the number of unique days
-            #in each year, which must exceed 330. 
-            if len(all_years_data)>11*30:
-                #And evaluates their mean. 
-                all_years_means=np.nanmean(all_years_data[:,4])
-                row=np.array([year,all_years_means])
-                yearsout=np.append(yearsout,[row],axis=0)
-            """    
+             
         self.all_years_mean=yearsout
         #Creating the arrayed reference period. 
         self.refperiod=self.find_ref_range(refst,refend)
@@ -116,8 +79,8 @@ class StationAnalyzer :
         self.find_baseline_range()
         
         #Creatse the actual values of TMID in the periods.
-        self.tmid_ref_data=self.tmid_selection(self.refperiod)
-        self.tmid_base_data=self.tmid_selection(self.baseperiod)
+        self.tmid_ref_data=self.tmix_selection(self.refperiod,self.tmid_array)
+        self.tmid_base_data=self.tmix_selection(self.baseperiod,self.tmid_array)
         
         #This creates an array with mean of all months. 
         monthout=np.empty([12,2])
@@ -263,16 +226,18 @@ class StationAnalyzer :
         
         #Then create a string.
         modaystr = str(int(firstbasemo))+"-"+str(int(firstbaseday))+" to "+str(int(lastbasemo))+"-"+str(int(lastbaseday))
-        self.base_period_string = modaystr+" in the years "+basepdyears    
+        self.base_period_string = modaystr+" in "+basepdyears    
         self.baseperiod = returner
         
     
-    #This function finds the mean of TMID over a specific set of Days of Year.
-    def tmid_selection(self,range1):
+    #This function selects the days coresponding to range1 in the dataset data.
+    #range1 is an array in the format of self.refperiod, a long list of rows in the form [year,doy]
+    #data is the data, in the format of self.tmid_array
+    def tmix_selection(self,range1,data):
         #Finds the location
-        out=self.tmid_array
+        out=data
         #doy=self.tmid_array[:,3]
-        year=self.tmid_array[:,0]
+        year=out[:,0]
         ref=range1
 
         index = np.in1d(year,ref[:,0])
@@ -342,8 +307,33 @@ class StationAnalyzer :
         if array == False:
             return slope,intercept
     
+    #This function takes an input station_data in the format of tmid_array (or tmax_array)
+    #and returns the max or min and accompanying date (based on variable MAX)
+    def find_max_min_info(self,tmix_array,MAX=True):
+       #First, find max or min.
+        if MAX == True:
+            value = np.nanmax(tmix_array[:,4])
+        if MAX == False:
+            value = np.nanmin(tmix_array[:,4])
+        
+        #This finds the index location of the max/min temperature
+        #First, by finding its index locations. 
+        value_loc=np.where(tmix_array[:,4]==value)
+        #Then, creating a list (since there may be more than one) of days of maxium temp. 
+        valyears=   tmix_array[value_loc][:,0]
+        valmonths=  tmix_array[value_loc][:,1]
+        valdays=   tmix_array[value_loc][:,2]
+        
+        #THen creating a list of strings including every day that was at the value. 
+        valuedates=[]
+        for i in np.arange(0,len(valyears)):
+            valdatestr=str(str(int(valyears[i]))+'-'+str(int(valmonths[i]))+"-"+str(int(valdays[i])))
+            valuedates.append(valdatestr)
+        return valuedates
+    
     #This creates a table (pd dataframe) of the key metrics of interest
     def key_metrics(self):       
+        #ALL TIME METRICS -- first finds the metrics over the whole period.
         #This first does the calculations, finding TMID avreage, TMAx, and TMIn,
         #of the entire record.
         whole_tmid_mean=np.nanmean(self.tmid_array[:,4])
@@ -351,60 +341,48 @@ class StationAnalyzer :
         whole_tmin=np.nanmin(self.tmin_array[:,4])
         whole_tmid_var=np.nanvar(self.tmid_array[:,4])
         
+        #Finds the dates of the maximum and minimum temperatures.  
+        maxdate = self.find_max_min_info(self.tmax_array)
+        mindate = self.find_max_min_info(self.tmin_array,MAX=False)
+       
+        #REFERENCE AND BASELINE PERIOD METRICS OF INTEREST
+        #First, select the data. 
+        refmiddata = self.tmix_selection(self.refperiod, self.tmid_array)
+        bmiddata = self.tmix_selection(self.baseperiod, self.tmid_array)
+        
         #This then calculates the mean over the ref and baseline periods. 
-        
-        ref_tmid_mean=np.nanmean(self.tmid_selection(self.refperiod)[:,4])
-        base_tmid_mean=np.nanmean(self.tmid_selection(self.baseperiod)[:,4])
-        #And max, min. 
-        ref_max=np.nanmax(self.tmid_ref_data[:,4])
-        base_max=np.nanmax(self.tmid_base_data[:,4])
-        
-        ref_min=np.nanmin(self.tmid_selection(self.refperiod)[:,4])
-        base_min=np.nanmin(self.tmid_selection(self.baseperiod)[:,4])
-        
+        ref_tmid_mean=np.nanmean(refmiddata[:,4])
+        base_tmid_mean=np.nanmean(bmiddata[:,4])
+                 
         #And variance. 
-        ref_tmid_var=np.nanvar(self.tmid_selection(self.refperiod)[:,4])
-        base_tmid_var=np.nanvar(self.tmid_selection(self.baseperiod)[:,4])
+        ref_tmid_var=np.nanvar(refmiddata[:,4])
+        base_tmid_var=np.nanvar(bmiddata[:,4])
         
-        #Calcualtes the frequency of extreme temperatures each year. 
-     #   hot_days = np.count_nonzero(self.tmax_array[:,4]>=self.yaml['HOTDAYS'])/(365)
-      #  cold_days = np.count_nonzero(self.tmin_array[:,4]<=self.yaml['COLDDAYS'])/(365)
+        #And max, min values in the REF and BASE.
+        #First, select the data. 
+        refmaxdata = self.tmix_selection(self.refperiod, self.tmax_array)
+        refmindata = self.tmix_selection(self.refperiod, self.tmin_array)
         
-        #This finds the index location of the max temperature
-        #First, by finding its index locations. 
-        maxloc=np.where(self.tmax_array[:,4]==whole_tmax)
-        #Then, creating a list (since there may be more than one) of days of maxium temp. 
-        maxyears=   self.tmax_array[maxloc][:,0]
-        maxmonths=   self.tmax_array[maxloc][:,1]
-        maxdays=   self.tmax_array[maxloc][:,2]
+        bmaxdata = self.tmix_selection(self.baseperiod, self.tmax_array)
+        bmindata = self.tmix_selection(self.baseperiod, self.tmin_array)
+        #Then, calcualte max and min. 
+        ref_max=np.nanmax(refmaxdata[:,4])
+        base_max=np.nanmax(bmaxdata[:,4])
+        ref_min=np.nanmin(refmindata[:,4])
+        base_min=np.nanmin(bmindata[:,4])
+        #Then, find max and min dates.
+        rmaxdate = self.find_max_min_info(refmaxdata)
+        rmindate = self.find_max_min_info(refmindata,MAX=False)
+        bmaxdate = self.find_max_min_info(bmaxdata)
+        bmindate = self.find_max_min_info(bmindata,MAX=False)
         
-        #THen creating a list of strings including every day that was at maximum. 
-        maxdate=[]
-        for i in np.arange(0,len(maxyears)):
-            maxdatestr=str(str(int(maxyears[i]))+'-'+str(int(maxmonths[i]))+"-"+str(int(maxdays[i])))
-            maxdate.append(maxdatestr)
-            
-        #This finds the index location of the min temperature
-        #First, by finding its index locations. 
-        minloc=np.where(self.tmin_array[:,4]==whole_tmin)
-        #Then, creating a list (since there may be more than one) of days of maxium temp. 
-        minyears=   self.tmin_array[minloc][:,0]
-        minmonths=   self.tmin_array[minloc][:,1]
-        mindays=   self.tmin_array[minloc][:,2]
-        
-        #THen creating a list of strings including every day that was at maximum. 
-        mindate=[]
-        for i in np.arange(0,len(minyears)):
-            mindatestr=str(str(int(minyears[i]))+'-'+str(int(minmonths[i]))+"-"+str(int(mindays[i])))
-            mindate.append(mindatestr)
-     
-        
+
         #Creates strings describing the range of dates.
         alltimestr1 = self.date_from_row(self.tmid_array[0])
         alltimestr2 = self.date_from_row(self.tmid_array[-1])
         #Creates strings describing the range of dates.
-        refstr1 = self.date_from_row(self.tmid_selection(self.refperiod)[0])
-        refstr2 = self.date_from_row(self.tmid_selection(self.refperiod)[-1])
+        refstr1 = self.date_from_row(self.tmid_ref_data[0])
+        refstr2 = self.date_from_row(self.tmid_ref_data[-1])
         #This creates a dataframe of data points.
         returner = pd.DataFrame(
             {
@@ -416,9 +394,9 @@ class StationAnalyzer :
                 "Variance of TMID over period (F)":[whole_tmid_var,ref_tmid_var,base_tmid_var],
                 
                 "Maximum Temperature over period (F)":[whole_tmax,ref_max,base_max],
-                "Date of Maximum Temperature":[maxdate,"Not yet calculated","Not yet calculated"],
+                "Date of Maximum Temperature":[maxdate,rmaxdate,bmaxdate],
                 "Minimum Temperature over period (F)":[whole_tmin,ref_min,base_min],
-                "Date of Minimum Temperature":[mindate,"Not yet calculated","Not yet calculated"],
+                "Date of Minimum Temperature":[mindate,rmindate,bmindate],
        
              
              }
@@ -468,8 +446,8 @@ class StationAnalyzer :
   
         
         #Creates a histogram of daily TMID values. 
-        ref_hist=self.tmid_selection(self.refperiod)[:,4]
-        base_hist=self.tmid_selection(self.baseperiod)[:,4]
+        ref_hist=self.tmid_ref_data[:,4]
+        base_hist=self.tmid_base_data[:,4]
         plt.hist(ref_hist,bins=30,density=True,label="Reference Period", alpha=0.5)
         plt.hist(base_hist,bins=30,density=True,label="Base Period", alpha=0.5)
         plt.title('Freqency Histogram of TMID over Reference and Base Period')

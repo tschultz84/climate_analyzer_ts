@@ -62,7 +62,7 @@
     #This is used to streamline how fast the "closest station" function works. 
             #stations are only sorted by distance if they rae within +/- coord_radius
             #of the reference point. 
-    SEARCH_RADIUS : 1
+    SEARCH_RADIUS : 3
 
 #these index valuesare used to hardcode smoe elements into Numpy format
 #Whiel getting rid of strings, making the whole process faster. 

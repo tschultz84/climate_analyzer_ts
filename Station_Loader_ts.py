@@ -111,7 +111,7 @@ class LoadStation :
        recentyear=date.today().year-1
        df = df1[df1['Lastyear']>=recentyear] 
        #and then strips out stations for which data is only very very recent. 
-       baseyear=self.yaml['BASEYEAR']
+       baseyear=self.yaml['BASEYEAR']-self.yaml['BASENOYEARS']
        df = df[df['Firstyear']<=baseyear] 
        
        #Now drops the year info, since we don't need it.
@@ -132,7 +132,7 @@ class LoadStation :
        if self.display: 
            print("Searching closest station among "
                               +str(len(df))+" stations within "+str(self.yaml['SEARCH_RADIUS'])+" degrees of the reference.")
-           print("This only includes stations with data available more recently than "+str(recentyear)+" and before "+str(self.yaml['BASEYEAR']))
+           print("which have more recent data than "+str(recentyear)+" and at least as early as "+str(self.yaml['BASEYEAR']-self.yaml['BASENOYEARS']))
        
        #This creates a dataseries which calculates the distancef rom the ref "pt"
        #to all of the nearest stations.
@@ -344,9 +344,9 @@ class LoadStation :
         itsgood=True
         thisyear = date.today().year
         #Check the latest year is present.
-        if (listyears[-1]!=thisyear):
+        if (listyears[-1]!=thisyear) or (listyears[-2]!=thisyear-1) or (listyears[-3]!=thisyear-2):
             itsgood = False
-            if self.display: print("Flag: The current year ("+str(thisyear)+") is not present.")
+            if self.display: print("Flag: I need every year of ("+str(thisyear-3)+" to "+str(thisyear)+") - but they are not all not present.")
         #Then, check if there are sufficient years in the recent trend.
         no_recent = np.shape(np.where(listyears>=thisyear-31))[1]
         if no_recent <= self.yaml['REQUIRED_TREND_YEARS']:
