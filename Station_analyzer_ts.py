@@ -113,7 +113,7 @@ class StationAnalyzer :
         #Creating the arrayed reference period. 
         self.refperiod=self.find_ref_range(refst,refend)
         #creates baseline range.
-        self.baseperiod=self.find_baseline_range()
+        self.find_baseline_range()
         
         #Creatse the actual values of TMID in the periods.
         self.tmid_ref_data=self.tmid_selection(self.refperiod)
@@ -234,7 +234,38 @@ class StationAnalyzer :
             #THen, creates each row element and appends it.             
             yearkarr = np.transpose(np.array([np.repeat(k,len(baseline_doy)),baseline_doy]))
             returner = np.append(returner,yearkarr,axis=0)
-        return returner
+        #This creates a formatted string defined the range of the baseline period.
+        
+        #basepd1=str(returner[0,0:2].astype(str))
+        #basepd2=str(returner[-1,0:2].astype(str))
+        
+        #First, find the first years in the base period, and make them into a string.
+        firstbaseyear = returner[0,0]
+        lastbaseyear = returner[-1,0]
+        basepdyears = str(int(firstbaseyear))+" to "+str(int(lastbaseyear))
+        
+        #Then, select the DOY in year 1.
+        basefirstyeardoy = returner[np.where(returner[:,0]==firstbaseyear)][:,1]
+        #Extract the first and last DOY.
+        firstbasedoy = basefirstyeardoy[0]
+        lastbasedoy = basefirstyeardoy[-1]
+        
+        #find exemplars at this DOY.
+        rowex1 = self.tmid_array[np.where(self.tmid_array[:,3]==firstbasedoy)][0]
+        rowex2 = self.tmid_array[np.where(self.tmid_array[:,3]==lastbasedoy)][0]
+        
+        #Find the month and day for each.
+        firstbasemo = rowex1[1]
+        firstbaseday= rowex1[2]
+        
+        lastbasemo = rowex2[1]
+        lastbaseday = rowex2[2]
+        
+        #Then create a string.
+        modaystr = str(int(firstbasemo))+"-"+str(int(firstbaseday))+" to "+str(int(lastbasemo))+"-"+str(int(lastbaseday))
+        self.base_period_string = modaystr+" in the years "+basepdyears    
+        self.baseperiod = returner
+        
     
     #This function finds the mean of TMID over a specific set of Days of Year.
     def tmid_selection(self,range1):
@@ -367,34 +398,20 @@ class StationAnalyzer :
             mindatestr=str(str(int(minyears[i]))+'-'+str(int(minmonths[i]))+"-"+str(int(mindays[i])))
             mindate.append(mindatestr)
      
-        #This creates a dataframe of data points.
-        #alltimestr1=str(self.tmid_array[0,0:3].astype(str))
-        #alltimestr2=str(self.tmid_array[-1,0:3].astype(str))
+        
+        #Creates strings describing the range of dates.
         alltimestr1 = self.date_from_row(self.tmid_array[0])
         alltimestr2 = self.date_from_row(self.tmid_array[-1])
-        
-        basepd1=str(self.baseperiod[0,0:2].astype(str))
-        basepd2=str(self.baseperiod[-1,0:2].astype(str))
-        
-        firstbaseyear = int(self.baseperiod[0,0])
-        lastbaseyear = int(self.baseperiod[-1,0])
-        basepdyears = str(firstbaseyear)+" to "+str(lastbaseyear)
-        basefirstyears = self.baseperiod[np.where(self.baseperiod[:,0]==firstbaseyear)]
-        #This needs to be adjusted- right now it onyl returns years in the baseline. 
-        #baspdmodays1 = str(int(basefirstyears[0,1]))+"-"+str(int(basefirstyears[0,2]))
-       # baspdmodays2 = str(int(basefirstyears[-1,1]))+"-"+str(int(basefirstyears[-1,2]))  
-       # basestr = baspdmodays1+" to "+baspdmodays2+" in "+basepdyears
-        basestr = basepdyears                                                     
-        
+        #Creates strings describing the range of dates.
         refstr1 = self.date_from_row(self.tmid_selection(self.refperiod)[0])
         refstr2 = self.date_from_row(self.tmid_selection(self.refperiod)[-1])
-        
+        #This creates a dataframe of data points.
         returner = pd.DataFrame(
             {
              "Period of Measure":
                  ["All Time:" +alltimestr1+" to "+alltimestr2,
                  "Reference Period: "+refstr1+" to "+refstr2,
-                 "Baseline Period: "+basestr],
+                 "Baseline Period: "+self.base_period_string],
                 "Average TMID over period (F)":[whole_tmid_mean,ref_tmid_mean,base_tmid_mean],
                 "Variance of TMID over period (F)":[whole_tmid_var,ref_tmid_var,base_tmid_var],
                 
