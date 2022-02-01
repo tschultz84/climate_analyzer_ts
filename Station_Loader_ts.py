@@ -7,7 +7,7 @@
 import pandas as pd
 from math import radians, cos, sin, asin, sqrt
 import time
-import os
+#import os
 import sys
 import yaml
 import numpy as np
@@ -18,6 +18,15 @@ import requests
 #%%
 """
 This object has functions to identify the station nearest to a reference lat, lon.
+It then downloads the data from the climate station closest to this lat lon.
+It then runs several checks on this data to see if it is acceptably compelte:
+* All incompelte years -- without 12 months of data and without YAML mindays i ecah month -- are deleted.
+*AFter this deletion, the dataset must still have complete data from the last 5 years 
+*It must have data prior to the baseline year defined in the YAML file called "load_stats_static.yaml".
+IT also calculates the TMID values, which is the average of TMAX and TMIN in every day.
+If the closest station to lat,lon, do not meet this above qualifiers, then it moves to the next 
+closest station; so on for 50 stations, before finding one which is sutiably complete.
+
 The inputs are as follows:
 *point is a list, in the form [latitude,longitude], which is the reference point
 (data will be lodded for the station closest to these coordinates where enough data
@@ -123,22 +132,19 @@ class LoadStation :
                
        #This steps strips out lat and lon values that are not nearby, reducing the number
        #of distance computations required.
-       #Using this limiter reduced the time to run this script by an entire second,
-       #from 1.2 seconds when searching all 40,000 rows with TMAX,
-       #to 0.1 seconds, when searching within 0.25 lat /lon degrees
        bar=self.yaml['SEARCH_RADIUS']
        df=df[df['Longitude']>point[1]-bar]
        df=df[df['Longitude']<point[1]+bar]
        df=df[df['Latitude']>point[0]-bar]
        df=df[df['Latitude']<point[0]+bar]
 
-        #Prints th enumber of stations being searched.
+        #Prints the number of stations being searched.
        if self.display: 
            print("Searching closest station among "
                               +str(len(df))+" stations within "+str(self.yaml['SEARCH_RADIUS'])+" degrees of the reference.")
            print("which have more recent data than "+str(recentyear)+" and at least as early as "+str(self.yaml['BASEYEAR']-self.yaml['BASENOYEARS']))
        
-       #This creates a dataseries which calculates the distancef rom the ref "pt"
+       #This creates a dataseries which calculates the distance from the ref "pt"
        #to all of the nearest stations.
        d1er=[]
        for i in range(0,len(df)):
