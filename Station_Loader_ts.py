@@ -62,7 +62,11 @@ class LoadStation :
                 if isgood == True:
                     #Set flag to stop the loop, if the data is good.
                     keep_going=False
+                    #SEtting variables to be extracted into Flask. 
                     self.name_closest_station=self.closest_stations.iloc[i][1] 
+                    self.id_closest_station=self.closest_stations.iloc[i][0] 
+                    #Lat Longitude.
+                    self.st_latlon_str = str(round(self.closest_stations.iloc[i][2],2))+" latitude, "+str(round(self.closest_stations.iloc[i][3],2))+" longitude"
                     self.miles_from_ref = self.closest_stations.iloc[i][4]
                     if self.display: 
                         
@@ -268,6 +272,8 @@ class LoadStation :
         #THESE STEPS SCRUB OUT ALL YEARS WHERE THERE IS INSUFFICIENT DATA.
         #First, list out the unique years.
         uniqueyears = np.unique(returner1[:,0])
+        
+        
         #This defines the minimum number of days of data which msut be present in eveyr month
         #for the year to be included.
         min_days=self.yaml['MIN_DAYS_PER_MO']
@@ -328,7 +334,8 @@ class LoadStation :
                 tokeep=np.append(tokeep,index)
         #Filter to just the years meeting all the conditions above.
         returner1 =returner1[tokeep]          
-        
+        #Pull the very first year in the dataset.
+        self.veryfirstyear=np.unique(returner1[:,0])[0]
         return returner1
     
     #This function reviews the station data and checks that it is complete,.

@@ -353,6 +353,10 @@ class StationAnalyzer :
         #This then calculates the mean over the ref and baseline periods. 
         ref_tmid_mean=np.nanmean(refmiddata[:,4])
         base_tmid_mean=np.nanmean(bmiddata[:,4])
+        
+        #This creates variables which can then be extracted. 
+        self.refmean = ref_tmid_mean
+        self.basemean = base_tmid_mean
                  
         #And variance. 
         ref_tmid_var=np.nanvar(refmiddata[:,4])
@@ -397,14 +401,30 @@ class StationAnalyzer :
                 "Date of Maximum Temperature":[maxdate,rmaxdate,bmaxdate],
                 "Minimum Temperature over period (F)":[whole_tmin,ref_min,base_min],
                 "Date of Minimum Temperature":[mindate,rmindate,bmindate],
-       
+      
              
              }
             )
+        
+        ##THese are key values to return out of the function.
+        self.alltimestr =alltimestr1+" to "+alltimestr2
+        self.whole_mean = whole_tmid_mean
+        self.whole_max_info = [whole_tmax,maxdate]
+        self.whole_min_info = [ whole_tmin,mindate]
+        self.ref_max_info = [ref_max,rmaxdate]
+        self.ref_min_info = [ref_min,rmindate]
+            
         t_test = self.do_t_test()
         #print("T Test Finding:")
         #print(t_test)
         pvalue = t_test[1]
+        
+        #First, create a string pulling out the difference between reference and baseline.
+        self.ref_base_delta = str(int((ref_tmid_mean-base_tmid_mean)*100)/100)
+        #And the same with the pvalue.
+        self.ref_pvalue = pvalue
+        
+        
         print("The Ref period is "+str(int((ref_tmid_mean-base_tmid_mean)*100)/100)+"F warmer than your base period.")
         print("Is this difference statistically different, ")
         print(" with a probability that this occured by chance less than "+str(self.yaml['ALPHA']))
@@ -412,11 +432,15 @@ class StationAnalyzer :
       #  print(self.do_t_test())
         if pvalue >= self.yaml['ALPHA']:
            print("No.")
+           self.ref_stat_sig = False
         if pvalue < self.yaml['ALPHA']:
            print("Yes.") 
+           self.ref_stat_sig = True
 
         trend_data = self.create_trend_line(self.all_years_mean,False)
         print("The warming trend over the past "+str(self.yaml['RECENT_TREND_YEARS'])+" is: "+str(trend_data[0]*10)+" F degrees per decade.")
+        #This creates a variable to pull out the warming, in F per decade.
+        self.trend_data_str=str(round(trend_data[0][0]*10,2))+" Farenheit per decade"
         #This calculates the correlation coefficient and accompanying p-value
         #which states whether this correlation is statistically significant. 
         
@@ -430,12 +454,15 @@ class StationAnalyzer :
                 
         print("Outcome of Pearson Correlation Coefficient Analysis: ")
         print("Coefficient of Correlation (R): "+str(pearsond1[0]))
-        print("Accompanying P value: "+str(pearsond1[1]))
+        print("Accompanying P value: "+str(100*pearsond1[1]))
         if pearsond1[1] < self.yaml['ALPHA']:
             is_real = True
         if pearsond1[1] >= self.yaml['ALPHA']:
             is_real = False
         print("Is this trened real using Pearson correlation analysis? "+str(is_real))
+        #Variables to pull out.
+        self.trend_p = pearsond1[1]
+        self.trend_is_real = is_real
      
         return returner   
     #end key_metrics
