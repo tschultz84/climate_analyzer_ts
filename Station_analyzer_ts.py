@@ -5,7 +5,7 @@
 #from shapely.ops import nearest_points
 #import geopandas as gpd
 import pandas as pd
-from math import radians, cos, sin, asin, sqrt
+#from math import radians, cos, sin, asin, sqrt
 import time
 import os
 import sys
@@ -19,9 +19,10 @@ from scipy.stats.stats import pearsonr
 #%%
 
 #All analysis fucntions for a station are done in this object.
-#The input is stationdata, which shoudl be self.station_data_claned from the StationLoad object
-#the refperiod is a 2 element list of start and end, reference period of analysis
+#The input is stationdata, which shoudl be self.station_data from the StationLoad object
+#the refst and refend are both strings, marking the beginning and end of the reference period of analysis
 #autorun simply immediately runs the KPI key_metrics function if True 
+#display prints the function outputs
 
 class StationAnalyzer :
     def __init__(self,stationdata,refst='2020-01-31',refend='2020-12-31',autorun=True,display=False):
@@ -35,10 +36,8 @@ class StationAnalyzer :
     
         #Creating the assigned value containing every single element. 
         self.all_data_long=stationdata
-        #Then assining off TMID, TMIN, and TMAX. 
-        #self.tmid_array = self.all_data_long[np.where(self.all_data_long[:,5]==self.yaml['TMID_INDEX'])][:,:5]
-        #self.tmin_array = self.all_data_long[np.where(self.all_data_long[:,5]==self.yaml['TMIN_INDEX'])][:,:5]
-        #self.tmax_array = self.all_data_long[np.where(self.all_data_long[:,5]==self.yaml['TMAX_INDEX'])][:,:5]
+        #Then assigning off TMID, TMIN, and TMAX values, which are different
+        #columns of the input data.
         self.tmid_array = self.all_data_long[:,[0,1,2,3,6]]
         self.tmin_array = self.all_data_long[:,[0,1,2,3,5]]
         self.tmax_array = self.all_data_long[:,[0,1,2,3,4]]
@@ -53,13 +52,12 @@ class StationAnalyzer :
         self.refststr=refst
         self.refendst=refend
         
-        
-        
-        #This creates an array with mean of all years. 
+        """This creates an array of annual average temperatures across the entire
+        time period.
+        """
         yearsout=np.empty([0,2])
         uniqueyears=np.unique(self.tmid_array[:,0])
-        for year in uniqueyears[:-1]:
-            #return_this_year = False    
+        for year in uniqueyears[:-1]:   
             #Select only the index values wehre the year is equal to year.
             index=np.where(self.tmid_array[:,0]==year)
             #Then, selects data for this year
@@ -71,8 +69,14 @@ class StationAnalyzer :
             all_years_means=np.nanmean(all_years_data[:,4])
             row=np.array([year,all_years_means])
             yearsout=np.append(yearsout,[row],axis=0)
-             
+        #Then assigns a variable to the output array.     
         self.all_years_mean=yearsout
+        
+        """These calls create arrays, containing a number of entries in the form
+        [year,day of year] which indicates all days in the references and baseline
+        periods. 
+        The TMID array values are then defined in these periods.        """
+        
         #Creating the arrayed reference period. 
         self.refperiod=self.find_ref_range(refst,refend)
         #creates baseline range.
@@ -82,7 +86,7 @@ class StationAnalyzer :
         self.tmid_ref_data=self.tmix_selection(self.refperiod,self.tmid_array)
         self.tmid_base_data=self.tmix_selection(self.baseperiod,self.tmid_array)
         
-        #This creates an array with mean of all months. 
+        """#This creates an array with monthyl average temperatures. """
         monthout=np.empty([12,2])
         for month in np.arange(1,13):
             
@@ -100,20 +104,29 @@ class StationAnalyzer :
         if autorun==True:
             self.kpi=self.key_metrics()
             self.charts=self.key_charts()
-            print(self.kpi)
+            #print(self.kpi)
             print(self.charts)
+            print(self.key_stats)
+            print(self.key_metrics_table)
             
+    """BEGIN FUNCTIONS"""    
+    
+    """DATA CLEANING AND WRANGLING FUNCTIONS
+    The following set of functions make various transformations on data
+    and create new arrays in order to complete various analyses.
+    """  
         
-        
-    #This function finds the Day of year, assuming every month has 31 days
-    #taking in a pd.DatetimeIndex object
+    #This function finds the Day of year, assuming every month has 31 days for simplicity
+    #Its input is a pd.DateTime object, it outputs an integer.
     def find_doy(self,pddate):
         doy = pddate.day+(pddate.month-1)*31
         return doy[0]
     
     #This function creates beginning and end dates for two different pd datetimeIndex
     #objects, and creates a range of days, int he form of [[Year1,Day of Year1],[Year1,DOY2],...]
-    #It takes in two pd.DatetimeIndex objects.
+    #It takes in two pd.DatetimeIndex objects which are the beginning and end of the reference
+    #periods.
+    #It is used to create the reference period range of days.
     def find_ref_range(self,pddate1,pddate2):
         #This function is supposed to be passed a Pandas datetimeIndex.
         #If it's a string, a conversion is made. 
@@ -127,58 +140,53 @@ class StationAnalyzer :
         doy2 = self.find_doy(pddate2)
         year1=pddate1.year[0]
         year2=pddate2.year[0]
-        #In the simple case, the referenc eperiod is in the same year,
-        #The array is very simple, jsut each row corresonding to the same year,
-        #with a year and DOY.
+        #This simply throws an error if the years are not ordered properly.   
+        if year1>year2:        
+          print("Your reference period is improperly defined.")
+          print("THe first year must be before the second year.")
+          sys.exit("Break Error due to bad dates. .")
+        #First, define if the reference period beginning and end are in the same eyar. 
         if year1==year2:
+            #Raise an exception if the reference period end is before the beginning.
             if doy1>doy2:
                 
                 print("Your reference period is improperly defined.")
                 print("THe first date must be before the second date.")
                 sys.exit("Break Error due to bad dates. .")
+            #But if the beginning and end are in the same year, then the array is very simple, 
+            #jsut each row corresonding to the same year,
+            #with a year and Day of Year.
             alldays = np.arange(doy1,doy2+1)
-            allyears = year1
+            #allyears = year1
             returner = np.transpose(np.array([np.repeat(year1,len(alldays)),alldays]))
             
-        #If year1 is before year2, the array becomes more compelx. 
+        #If year1 is before year2, the array is filled with day of year valuse
+        #that include all days in the year. 
         if year1 < year2:
-            
+            #This prints a message, indicating that reference periods including mroe than one year
+            #include the entire period of time.
             print("You included more than one year in the reference period.")
-            print("The analysis will include all days in all years included.")
-            print("I do this, since the baseline period is multiple years.")
+            print("The analysis will include all days in each year included.")
             print("In order to avoid seasonal bias, I have to average over the entrie year.")
-            print("For example if you enter 2020 Jan 1 to 2021 July 1 as a reference,")
+            print("For example if you entered 2020 Jan 1 to 2021 July 1 as a reference,")
             print("this biases your result to be much warmer than average years")
-            #First, define the days for the first year. This includes the days from the
-            #begining of reference period to the end of the  eyra of teh reference period. 
-            year1days=np.arange(1,372+1)
-            returner = np.transpose(np.array([np.repeat(year1,len(year1days)),year1days]))
-            
-            #some specical steps have to eb taken, if there are more than 2 adjacent year included.
-            if ( year2 - year1 ) > 1 :
-                #First, define all the days in the list. 
-                dayskarr = np.arange(1,372+1)
-                for k in np.arange(year1+1,year2):
-                    #Then, over all years in between year 1 and eyar 2, create a new array
-                    #This one has DOY frmo 1 to 372 and every yera in the intermediate period. 
-                    
-                    yearkarr = np.transpose(np.array([np.repeat(k,len(dayskarr)),dayskarr]))
-                    returner = np.append(returner,yearkarr,axis=0)
-            
-            #Then, define the days for the seconds year. This includes the days from the
-            #end of reference period to the beginning of the year of the last year of reference. 
-            year2days=np.arange(1,372+1)
-            year2arr= np.transpose(np.array([np.repeat(year2,len(year2days)),year2days]))
-            returner = np.append(returner,year2arr,axis=0)
-          #And, throws an error if the years are not ordered properly.   
-        if year1>year2:        
-            print("Your reference period is improperly defined.")
-            print("THe first year must be before the second year.")
-            sys.exit("Break Error due to bad dates. .")
+           
+           #Define the returned array, which is empty.
+            returner = np.empty([0,2])
+            #First, define all the days in the list, which includes all days in the year
+            dayskarr = np.arange(1,372+1)
+            #for k in np.arange(year1+1,year2):
+            for k in np.arange(year1,year2+1):
+                #Then, over all years in between year 1 and year 2, create a new array
+                #This one has DOY from 1 to 372 and every year in the intermediate period.               
+                yearkarr = np.transpose(np.array([np.repeat(k,len(dayskarr)),dayskarr]))
+                #This then appends to returner this array.
+                returner = np.append(returner,yearkarr,axis=0)    
+       
         return returner    
     
-    #This then finds the Days of Year for the analyzed baseline period, such that
-    #the comparison is adequately seasonalized..
+    #This then finds the Days of Year for the analyzed baseline period, using
+    #the same days of year as the reference period, to ensure the comparison is fair.
     def find_baseline_range(self):
         #Takes the unique days from the refperiod.
         baseline_doy = np.unique(self.refperiod[:,1])
@@ -199,9 +207,8 @@ class StationAnalyzer :
             returner = np.append(returner,yearkarr,axis=0)
         #This creates a formatted string defined the range of the baseline period.
         
-        #basepd1=str(returner[0,0:2].astype(str))
-        #basepd2=str(returner[-1,0:2].astype(str))
-        
+        #The following lines turn the baseline period provided into a nicely formatted
+        #string, for display in the final returner table.
         #First, find the first years in the base period, and make them into a string.
         firstbaseyear = returner[0,0]
         lastbaseyear = returner[-1,0]
@@ -226,30 +233,49 @@ class StationAnalyzer :
         
         #Then create a string.
         modaystr = str(int(firstbasemo))+"-"+str(int(firstbaseday))+" to "+str(int(lastbasemo))+"-"+str(int(lastbaseday))
+        #This creates an object out of the string for later reference.
         self.base_period_string = modaystr+" in "+basepdyears    
+        #this is the baseline period used in calculations.
         self.baseperiod = returner
         
     
-    #This function selects the days coresponding to range1 in the dataset data.
+    #This function selects the days corresponding to "range1" from the dataset "data".
     #range1 is an array in the format of self.refperiod, a long list of rows in the form [year,doy]
-    #data is the data, in the format of self.tmid_array
+    #data is  data, in the format of self.tmid_array
     def tmix_selection(self,range1,data):
-        #Finds the location
+        #Rename the input variables, which are subject to change.
         out=data
-        #doy=self.tmid_array[:,3]
-        year=out[:,0]
         ref=range1
+        
+        #Select only the years.
+        year=out[:,0]
 
+        #Select only years in the data which are present in range1.
         index = np.in1d(year,ref[:,0])
+        #Select only the subset of years defined by index.
         out=out[index]
+        #Select only the days of year in ref.
         index=np.in1d(out[:,3],ref[:,1])
         out=out[index]
         return out
-
+    
+     #This takes a row from tmid_array, tmax_array, etc., and returns a formatted string.
+     #The excludeyear field excludes the year, which makes displaying the baseline period easier.
+    def date_from_row(self,row,excludeyear=False): 
+        year = str(int(row[0]))  
+        month = str(int(row[1]))
+        day = str(int(row[2]))
+        if excludeyear==False:
+            return year+"-"+month+"-"+day  
+        if excludeyear==True:
+            return month+"-"+day  
+        
+    """STATISTICAL TESTS ----------
+    The following functions perform various statistical tests."""
     #This completes a t-test of the reference vs. baseline period TMID values. 
     #This function reviews the TMID data for the reference and baseline,
-    #compares them, does a t-test, and returns "TRUE" if pvalue is less than ALPHA
-    #(ALPHA beign defined in the YAML file) and FALSE otherwise. 
+    #compares them, does a t-test using stats.ttest_ind.
+   
     def do_t_test(self):
         #Define the datasets. 
         data1=self.tmid_ref_data[:,4]
@@ -276,10 +302,10 @@ class StationAnalyzer :
         return result
     
     #This creates a trend line.
-    #It takes as input a numpy array int he format of self.all_years_mean
+    #It takes as input a numpy array containing yearly averages, in the format of self.all_years_mean
     #Its output is a tuple, with the first two being the slope and intercept.
     #and the third element is an array of the year and value of the line according to this regression.
-    #If array=False, then this array is not generated or returned (this is for the permutation step)
+    #If array=False, then this array is not generated or returned 
     def create_trend_line(self,yearsdata,array=True):
         #If array was set improperly, automatically change it to a Boolean true value. 
         if (array != False) & (array != True):
@@ -307,10 +333,16 @@ class StationAnalyzer :
         if array == False:
             return slope,intercept
     
+    """METRIC ANALYSES FUNCTIONS
+    These functions return various metrics of analyses used in key_metrics.
+    """
+    
     #This function takes an input station_data in the format of tmid_array (or tmax_array)
-    #and returns the max or min and accompanying date (based on variable MAX)
+    #and returns the dates when the maximum or minimum temperature occured in the timeframe..
+    #If MAX=TRUE, then it finds the date of the temperature maximum in the range of dates in tmix_array.
+    #If MAX=FALSE, then it does this for the temperature minimum
     def find_max_min_info(self,tmix_array,MAX=True):
-       #First, find max or min.
+       #First, find tmax or tmin value.
         if MAX == True:
             value = np.nanmax(tmix_array[:,4])
         if MAX == False:
@@ -319,7 +351,7 @@ class StationAnalyzer :
         #This finds the index location of the max/min temperature
         #First, by finding its index locations. 
         value_loc=np.where(tmix_array[:,4]==value)
-        #Then, creating a list (since there may be more than one) of days of maxium temp. 
+        #Then, creating a list (since there may be more than one) of days of max/min temp. 
         valyears=   tmix_array[value_loc][:,0]
         valmonths=  tmix_array[value_loc][:,1]
         valdays=   tmix_array[value_loc][:,2]
@@ -400,20 +432,20 @@ class StationAnalyzer :
                 "Maximum Temperature over period (F)":[whole_tmax,ref_max,base_max],
                 "Date of Maximum Temperature":[maxdate,rmaxdate,bmaxdate],
                 "Minimum Temperature over period (F)":[whole_tmin,ref_min,base_min],
-                "Date of Minimum Temperature":[mindate,rmindate,bmindate],
-      
-             
+                "Date of Minimum Temperature":[mindate,rmindate,bmindate],      
              }
             )
         
         ##THese are key values to return out of the function.
+        #You can grab these via the object handle. 
         self.alltimestr =alltimestr1+" to "+alltimestr2
         self.whole_mean = whole_tmid_mean
         self.whole_max_info = [whole_tmax,maxdate]
         self.whole_min_info = [ whole_tmin,mindate]
         self.ref_max_info = [ref_max,rmaxdate]
         self.ref_min_info = [ref_min,rmindate]
-            
+        
+        
         t_test = self.do_t_test()
         #print("T Test Finding:")
         #print(t_test)
@@ -425,26 +457,25 @@ class StationAnalyzer :
         self.ref_pvalue = pvalue
         
         
-        print("The Ref period is "+str(int((ref_tmid_mean-base_tmid_mean)*100)/100)+"F warmer than your base period.")
-        print("Is this difference statistically different, ")
-        print(" with a probability that this occured by chance less than "+str(self.yaml['ALPHA']))
-        print(" i.e., alpha is "+str(self.yaml['ALPHA'])+str("?"))
-      #  print(self.do_t_test())
+       # print("The Ref period is "+str(int((ref_tmid_mean-base_tmid_mean)*100)/100)+"F warmer than your base period.")
+       # print("Is this difference statistically different, ")
+        #print(" with a probability that this occured by chance less than "+str(self.yaml['ALPHA']))
+        #print(" i.e., alpha is "+str(self.yaml['ALPHA'])+str("?"))
+     
         if pvalue >= self.yaml['ALPHA']:
-           print("No.")
+           #print("No.")
            self.ref_stat_sig = False
         if pvalue < self.yaml['ALPHA']:
-           print("Yes.") 
+           #print("Yes.") 
            self.ref_stat_sig = True
 
         trend_data = self.create_trend_line(self.all_years_mean,False)
-        print("The warming trend over the past "+str(self.yaml['RECENT_TREND_YEARS'])+" is: "+str(trend_data[0]*10)+" F degrees per decade.")
+        #print("The warming trend over the past "+str(self.yaml['RECENT_TREND_YEARS'])+" is: "+str(trend_data[0]*10)+" F degrees per decade.")
         #This creates a variable to pull out the warming, in F per decade.
         self.trend_data_str=str(round(trend_data[0][0]*10,2))+" Farenheit per decade"
         #This calculates the correlation coefficient and accompanying p-value
         #which states whether this correlation is statistically significant. 
         
-        #years_index=~np.isnan(self.all_years_mean[:,1])
         #First, format, and take only the recent years of data.
         recentyears=self.yaml['RECENT_TREND_YEARS']
         x5 = self.all_years_mean[-recentyears:,0]
@@ -452,22 +483,47 @@ class StationAnalyzer :
         
         pearsond1 = pearsonr(x5,y5)
                 
-        print("Outcome of Pearson Correlation Coefficient Analysis: ")
-        print("Coefficient of Correlation (R): "+str(pearsond1[0]))
-        print("Accompanying P value: "+str(100*pearsond1[1]))
+       # print("Outcome of Pearson Correlation Coefficient Analysis: ")
+       # print("Coefficient of Correlation (R): "+str(pearsond1[0]))
+       # print("Accompanying P value: "+str(100*pearsond1[1]))
         if pearsond1[1] < self.yaml['ALPHA']:
             is_real = True
         if pearsond1[1] >= self.yaml['ALPHA']:
             is_real = False
-        print("Is this trened real using Pearson correlation analysis? "+str(is_real))
+       # print("Is this trened real using Pearson correlation analysis? "+str(is_real))
         #Variables to pull out.
         self.trend_p = pearsond1[1]
         self.trend_is_real = is_real
-     
+        #This creates a dataframe of statistical information points.
+        key_stats = pd.DataFrame(
+            {
+                "Metric":
+                    ["Reference Minus Basline Temperature Change",
+                     str(self.yaml['RECENT_TREND_YEARS'])+ " year warming trend"
+                     ],
+             "Value":
+                 [str(int((ref_tmid_mean-base_tmid_mean)*100)/100)+ "F",
+                 self.trend_data_str ],
+             "P-Value of Difference":
+                 [self.ref_pvalue,
+                  self.trend_p],
+                 "Statistically Significant?":
+                     [self.ref_stat_sig,
+                      self.trend_is_real],
+                     "Alpha Value":
+                         [self.yaml['ALPHA'],
+                          self.yaml['ALPHA']]
+                
+                }
+        )
+        #print(key_stats)
+        
+        self.key_metrics_table =returner
+        self.key_stats = key_stats
         return returner   
-    #end key_metrics
     
-            
+    #end key_metrics
+              
      #This creates several charts of interest.
     def key_charts(self):
   
@@ -521,14 +577,5 @@ class StationAnalyzer :
         plt.text((refspan_min + refspan_max)/2,np.nanmin(self.all_years_mean[:,1]),'Reference',horizontalalignment='center')
         
         plt.show()
-     #This takes a row from tmid_array, tmax_array, etc., and returns a formatted string.
-     #The excludeyear field excludes the year, which makes displaying the baseline period easier.
-    def date_from_row(self,row,excludeyear=False): 
-        year = str(int(row[0]))  
-        month = str(int(row[1]))
-        day = str(int(row[2]))
-        if excludeyear==False:
-            return year+"-"+month+"-"+day  
-        if excludeyear==True:
-            return month+"-"+day  
+
         

@@ -16,7 +16,7 @@ bzdata=load.LoadStation([45.647256643331126,-111.04060494981753],True) #Loading 
 
 #%%
 
-date1 = '2021-1-1'
+date1 = '2010-1-1'
 date2 = '2021-12-31'
 bzcalc=analyze.StationAnalyzer(bzdata.station_data,date1,date2,display=True)
 
@@ -30,7 +30,7 @@ obdata=load.LoadStation([37.755663644,-122.506497974],True) #Loading in Ocean Be
 
 
 #%%
-date1 = '2010-1-1'
+date1 = '2019-1-1'
 date2 = '2020-12-1'
 obcalc=analyze.StationAnalyzer(obdata.station_data,date1,date2,display=True)
 
