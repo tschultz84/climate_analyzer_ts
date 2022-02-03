@@ -51,11 +51,13 @@ class LoadStation :
         if (type(point) != str) and (len(point)==2):
             self.refpoint=point
         
-        #This YAML file contains a great deal of static information, 
-        #such as directory information. 
-        yaml_dir="C:\\Users\\14154\\OneDrive\\Python\\climate_mapper\\python\\climate_analyzer_ts\\"
-        yaml_file = open(yaml_dir+"load_stats_static.yaml")
+        #This YAML file contains a great deal of static information.
+        yaml_file = open("load_stats_static.yaml")
         self.yaml = yaml.load(yaml_file, Loader=yaml.FullLoader)
+        
+        #This yaml contains file name information
+        yaml_file = open("filenames.yaml")
+        self.files_yaml = yaml.load(yaml_file, Loader=yaml.FullLoader)
         
         #First, the list of stations is generated.
         self.closest_stations = self.nearest_station(point)
@@ -117,7 +119,7 @@ class LoadStation :
        #This initializes the actual data to search, from the list of stations
        #It only reads in the columns which are necessary to search by distance. 
        #It also searches only for the TMAX values. 
-       df1 = pd.read_csv(self.yaml['STATIONMETA'],
+       df1 = pd.read_csv(self.files_yaml['STATIONMETA'],
                         dtype={'Firstyear': np.int64,'Lastyear': np.int64})[['ID','Name','Latitude','Longitude','Firstyear','Lastyear']]
        
        #These lines strip out stations where there is no recent data (from within the last year), 

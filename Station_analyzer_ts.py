@@ -30,8 +30,8 @@ class StationAnalyzer :
         self.display=display
         #This YAML file contains a great deal of static information, 
         #such as directory information. 
-        yaml_dir="C:\\Users\\14154\\OneDrive\\Python\\climate_mapper\\python\\climate_analyzer_ts\\"
-        yaml_file = open(yaml_dir+"load_stats_static.yaml")
+       # yaml_dir="C:\\Users\\14154\\OneDrive\\Python\\climate_mapper\\python\\climate_analyzer_ts\\"
+        yaml_file = open("load_stats_static.yaml")
         self.yaml = yaml.load(yaml_file, Loader=yaml.FullLoader)
     
         #Creating the assigned value containing every single element. 

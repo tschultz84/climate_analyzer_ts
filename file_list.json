@@ -1,7 +1,0 @@
-{
-   yaml_dir:"C:\\Users\\14154\\OneDrive\\Python\\climate_mapper\\python\\climate_analyzer_ts\\",
-   stations_to_read: "self.yaml['STATIONMETA']",
-   STATIONMETA : "C:\\ts_big_data_files\\ghcnd_station_master_ts_tmax.csv"
-   
-   
-}

@@ -1,25 +1,19 @@
 # -*- coding: utf-8 -*-
 
-#This YAML file contains all the drop flags elements and row ordering
-#needed to load .dly files.
-
- #This allows you to read .dly files, which are fixed width filesn. It generates the column number dividers 
- #needed to read the file. THis is all based on the following documentation.
- #See https://www1.ncdc.noaa.gov/pub/data/ghcn/daily/readme.txt
-
-#As default, the "flag" columns wont be imported. NOAA has a long set of 
-#columns which are "data flags" which signal if a data point is suspect for some reason
-#or another.
-#I included them for completeness, so you can load flags if you wish.
-
-#This array contains the number of columns, if they are imported with no flags
+#This YAML file contains parameters needed to use the load stations and station analyzer functions.
 ---
 #==============
 #DIRECTORIES AND FILE LOCATIONS
 
+#GHCND_STATIONS is the NOAA file containing station meta info (lat, lon, elevation.)
+ #   GHCND_STATIONS : "C:\\ts_big_data_files\\ghcnd-stations.txt"
+    
+#GHCND_INVENTORY is the NOAA file containing the climate variables each station records
+  #  GHCND_INVENTORY : "C:\\ts_big_data_files\\ghcnd-inventory.txt"
+
 #STATIONMETA is the file containing all the lat / lon information for the stations.
     STATIONMETA : "C:\\ts_big_data_files\\ghcnd_station_master_ts_tmax.csv"
-    
+   
 #NOAA_URL is the url to the directory containing the DLY files. 
     NOAA_URL : 'https://www.ncei.noaa.gov/data/global-historical-climatology-network-daily/access/'
 
