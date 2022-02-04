@@ -1,13 +1,9 @@
 # -*- coding: utf-8 -*-
 
-#import shapely
-#from shapely.geometry import Point,MultiPoint,Polygon
-#from shapely.ops import nearest_points
-#import geopandas as gpd
+
 import pandas as pd
 from math import radians, cos, sin, asin, sqrt
 import time
-#import os
 import sys
 import yaml
 import numpy as np
@@ -15,7 +11,7 @@ from datetime import date
 import requests
 
 
-#%%
+
 """
 This object has functions to identify the station nearest to a reference lat, lon.
 It then downloads the data from the climate station closest to this lat lon.

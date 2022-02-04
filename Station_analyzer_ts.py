@@ -1,31 +1,24 @@
 # -*- coding: utf-8 -*-
 
-#import shapely
-#from shapely.geometry import Point,MultiPoint,Polygon
-#from shapely.ops import nearest_points
-#import geopandas as gpd
 import pandas as pd
-#from math import radians, cos, sin, asin, sqrt
-import time
-import os
 import sys
 import yaml
 import numpy as np
-from datetime import date
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 from sklearn.linear_model import LinearRegression
 from scipy.stats.stats import pearsonr
-#%%
+from IPython.display import display_html 
+
 
 #All analysis fucntions for a station are done in this object.
 #The input is stationdata, which shoudl be self.station_data from the StationLoad object
 #the refst and refend are both strings, marking the beginning and end of the reference period of analysis
-#autorun simply immediately runs the KPI key_metrics function if True 
+
 #display prints the function outputs
 
 class StationAnalyzer :
-    def __init__(self,stationdata,refst='2020-01-31',refend='2020-12-31',autorun=True,display=False):
+    def __init__(self,stationdata,refst='2020-01-31',refend='2020-12-31',display=False):
         
         self.display=display
         #This YAML file contains a great deal of static information, 
@@ -101,13 +94,14 @@ class StationAnalyzer :
         self.all_months_mean=monthout
         
         #Runs the key_metrics function if desired.
-        if autorun==True:
-            self.kpi=self.key_metrics()
-            self.charts=self.key_charts()
-            #print(self.kpi)
-            print(self.charts)
-            print(self.key_stats)
-            print(self.key_metrics_table)
+        if self.display==True:
+            #Generate variables. 
+            self.key_metrics()
+            #show everything in a nice format. 
+            display_html(self.key_metrics_table)
+            display_html(self.key_stats)
+            self.key_charts()
+            
             
     """BEGIN FUNCTIONS"""    
     
@@ -167,7 +161,7 @@ class StationAnalyzer :
             #include the entire period of time.
             print("You included more than one year in the reference period.")
             print("The analysis will include all days in each year included.")
-            print("In order to avoid seasonal bias, I have to average over the entrie year.")
+            print("In order to avoid seasonal bias, I have to average over the entire year.")
             print("For example if you entered 2020 Jan 1 to 2021 July 1 as a reference,")
             print("this biases your result to be much warmer than average years")
            
