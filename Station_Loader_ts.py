@@ -97,6 +97,11 @@ class LoadStation :
                     keep_going=True
                     if self.display: 
                         print("Station ID# "+str(self.closest_stations.iloc[i,0])+", called "+str(self.closest_stations.iloc[i][1] )+" is incomplete. Don't use it.")
+                if i == (len(self.closest_stations)-1):
+                    print(f"I checked { i } weather stations within {self.yaml['SEARCH_RADIUS']} degrees of {point} in all directions.")
+                    print("None have data which is adequate for my use.")
+                    print("Please enter a different point, or change your baseline period in load_stats_static.yaml.")
+                    print("My guess is that FIRST_BASE_YEAR is too early.")
                   
     #This funtion runs all functions.
     def run_this_baby(self,point):
@@ -129,24 +134,30 @@ class LoadStation :
        df1 = pd.read_csv(self.files_yaml['STATIONMETA'],
                         dtype={'Firstyear': np.int64,'Lastyear': np.int64})[['ID','Name','Latitude','Longitude','Firstyear','Lastyear']]
        
-       #These lines strip out stations where there is no recent data (from within the last year), 
-       recentyear=date.today().year-1
-       df = df1[df1['Lastyear']>=recentyear] 
-       #and then strips out stations for which data is only very very recent. 
-       baseyear=self.yaml['FIRST_BASE_YEAR']
-       #baseyear=self.yaml['BASEYEAR']-self.yaml['BASENOYEARS']
-       df = df[df['Firstyear']<=baseyear] 
        
-       #Now drops the year info, since we don't need it.
-       df=df[['ID','Name','Latitude','Longitude']]
                
        #This steps strips out lat and lon values that are not nearby, reducing the number
        #of distance computations required.
        bar=self.yaml['SEARCH_RADIUS']
-       df=df[df['Longitude']>point[1]-bar]
+       df=df1[df1['Longitude']>point[1]-bar]
        df=df[df['Longitude']<point[1]+bar]
        df=df[df['Latitude']>point[0]-bar]
        df=df[df['Latitude']<point[0]+bar]
+       
+       #These lines strip out stations where there is no recent data (from within the last year), 
+       recentyear=date.today().year-1
+       df = df[df['Lastyear']>=recentyear] 
+       #and then strips out stations for which data is only very very recent. 
+       baseyear=self.yaml['FIRST_BASE_YEAR']
+       #baseyear=self.yaml['BASEYEAR']-self.yaml['BASENOYEARS']
+       df = df[df['Firstyear']<=baseyear]
+       if len(df) == 0:
+           print(f"There are no stations within {bar} degrees of {point} in any direction that have data as far back as the year {baseyear}.")
+           print("Please enter a more realistic base year. I'd suggest that even putting 1890 as a base year is optimistic, there may be none.")
+           sys.exit("Base year is too early. Please correct FIRST_BASE_YEAR in load_stats_static.yaml.")
+       
+       #Now drops the year info, since we don't need it.
+       df=df[['ID','Name','Latitude','Longitude']]
 
         #Prints the number of stations being searched.
        if self.display: 

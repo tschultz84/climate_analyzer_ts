@@ -25,7 +25,7 @@
     
     #FIRST_BASE_YEAR is the first year for which data must be available. 
     #stations without data going back to this year are not loaded. 
-    FIRST_BASE_YEAR : 1950
+    FIRST_BASE_YEAR : 1900
      
     #LAST_BASE_YEAR is the last year in the baseline for which data must be available. 
     #stations without data going back to this year are not loaded. 
