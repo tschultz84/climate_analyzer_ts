@@ -18,7 +18,7 @@ from IPython.display import display_html
 #display prints the function outputs
 
 class StationAnalyzer :
-    def __init__(self,stationdata,refst='2020-01-31',refend='2020-12-31',display=False):
+    def __init__(self,stationdata,refst='2020-01-31',refend='2020-12-31',display=True):
         
         self.display=display
         #This YAML file contains a great deal of static information, 
@@ -187,7 +187,12 @@ class StationAnalyzer :
         #Then, all the baseline years.
         baseline_years = np.unique(self.all_years_mean[:,0])
         #and finally, limits it to the first set of baseline years.
-        baseline_years=baseline_years[0:self.yaml['BASENOYEARS']]
+        
+        #index1 = np.where(baseline_years == self.yaml['FIRST_BASE_YEAR'])[0]
+        index = np.where(baseline_years <= self.yaml['LAST_BASE_YEAR'])[0]
+        index = np.where(baseline_years[index] >= self.yaml['FIRST_BASE_YEAR'])[0]
+        baseline_years=baseline_years[index]
+        #baseline_years=baseline_years[0:self.yaml['BASENOYEARS']]
         
         #Then, create an array which contains all of the elemnts. 
         #THe first column are the years.

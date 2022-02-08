@@ -41,7 +41,8 @@ The inputs are as follows:
 """    
 class LoadStation :
     def __init__(self,point,printudpate=False):
-                
+        
+        
         self.display=  printudpate   
         #If a point (lat, lon) is passed, then create a point. 
         if (type(point) != str) and (len(point)==2):
@@ -50,6 +51,16 @@ class LoadStation :
         #This YAML file contains a great deal of static information.
         yaml_file = open("load_stats_static.yaml")
         self.yaml = yaml.load(yaml_file, Loader=yaml.FullLoader)
+        
+        #First, a couple checks on the baseline period. If badly defined, immediately reject the function.
+        #Check there are enough years between the specified firest and last years in the baseline period.
+        basecalcyears=self.yaml['LAST_BASE_YEAR']-self.yaml['FIRST_BASE_YEAR']
+        if (basecalcyears) <= (self.yaml['BASENOYEARS']+1):
+            
+            print(f"User Error: There are not {self.yaml['BASENOYEARS']} years in-between {self.yaml['FIRST_BASE_YEAR']} and {self.yaml['LAST_BASE_YEAR']}.")
+            print("Please review the variables in load_stats_static.yaml to ensure the baseline period is appropriately defined.")
+            sys.exit("Badly defined FIRST_BASE_YEARS and LAST_BASE_YEARS variables in the load_stats_static.yaml file.")
+        
         
         #This yaml contains file name information
         yaml_file = open("filenames.yaml")
@@ -122,7 +133,8 @@ class LoadStation :
        recentyear=date.today().year-1
        df = df1[df1['Lastyear']>=recentyear] 
        #and then strips out stations for which data is only very very recent. 
-       baseyear=self.yaml['BASEYEAR']-self.yaml['BASENOYEARS']
+       baseyear=self.yaml['FIRST_BASE_YEAR']
+       #baseyear=self.yaml['BASEYEAR']-self.yaml['BASENOYEARS']
        df = df[df['Firstyear']<=baseyear] 
        
        #Now drops the year info, since we don't need it.
@@ -140,7 +152,7 @@ class LoadStation :
        if self.display: 
            print("Searching closest station among "
                               +str(len(df))+" stations within "+str(self.yaml['SEARCH_RADIUS'])+" degrees of the reference.")
-           print("which have more recent data than "+str(recentyear)+" and at least as early as "+str(self.yaml['BASEYEAR']-self.yaml['BASENOYEARS']))
+           print("which have more recent data than "+str(recentyear)+" and at least as early as "+str(self.yaml['FIRST_BASE_YEAR']))
        
        #This creates a dataseries which calculates the distance from the ref "pt"
        #to all of the nearest stations.
@@ -354,7 +366,7 @@ class LoadStation :
         #only if the dataset pasess al checks.
         itsgood=True
         thisyear = date.today().year
-        #Check the latest year is present.
+        #Check the latest few years are present.
         if (listyears[-1]!=thisyear) or (listyears[-2]!=thisyear-1) or (listyears[-3]!=thisyear-2):
             itsgood = False
             if self.display: print("Flag: I need every year of ("+str(thisyear-3)+" to "+str(thisyear)+") - but they are not all not present.")
@@ -366,11 +378,17 @@ class LoadStation :
                 print("Flag: Insufficent years to calculate recent trend.") 
                 print("I need more than "+str(self.yaml['REQUIRED_TREND_YEARS'])+" years to calculate a trend, but only "+str(no_recent)+" available.")
         #Then, that there are enough years to calculate a baseline.
-        no_early = np.shape(np.where(listyears<=self.yaml['BASEYEAR']))[1]
+        #First, limit it to the years in the baseline range. 
+        early_index = np.where(listyears<=self.yaml['LAST_BASE_YEAR'])
+        early_index = np.where(listyears[early_index]>=self.yaml['FIRST_BASE_YEAR'])
+        #Then, count the years.
+        no_early = np.shape(early_index)[1]
+        #no_early = np.shape(np.where(listyears<=self.yaml['BASEYEAR']))[1]
         if no_early <= self.yaml['BASENOYEARS']:
             itsgood = False
             if self.display: 
-                print("Flag: Insufficent years before "+str(self.yaml['BASEYEAR'])+" to calculate mean.")
-                print ("There are "+str(no_early)+" years in this period, I need at least "+str(self.yaml['BASENOYEARS'])+" to set an accurate baseline.")
+                print("Flag: Insufficent years before "+str(self.yaml['LAST_BASE_YEAR'])+" to calculate mean for baseline period.")
+                print(f"There are {no_early} years in the period {self.yaml['FIRST_BASE_YEAR']} to {self.yaml['LAST_BASE_YEAR']}, but I need {self.yaml['BASENOYEARS']} to set an accurate baseline.")
+                #print ("There are "+str(no_early)+" years in this period, I need at least "+str(self.yaml['BASENOYEARS'])+" to set an accurate baseline.")
         return itsgood
               

@@ -23,6 +23,14 @@
     #stations with no data prior to this year are not loaded. 
     BASEYEAR : 1970
     
+    #FIRST_BASE_YEAR is the first year for which data must be available. 
+    #stations without data going back to this year are not loaded. 
+    FIRST_BASE_YEAR : 1950
+     
+    #LAST_BASE_YEAR is the last year in the baseline for which data must be available. 
+    #stations without data going back to this year are not loaded. 
+    LAST_BASE_YEAR : 1990
+    
     #BASENOYEARS is the number of years included in the baseline period. 
     BASENOYEARS : 30
     
