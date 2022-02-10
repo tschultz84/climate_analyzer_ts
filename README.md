@@ -89,4 +89,29 @@ It also calculates the TMID values, which is the average of TMAX and TMIN in eve
 StationAnalyzer.all_years_mean is an Nx2 numpy array. THe firts column is the year. The second is the average of TMID in that year.
 StationAnalyzer.tmid_ref_data and StationAnalyzer.tmid_base_data are the daily data values for just the reference and baseline range.
 StationAnalyzer.key_metrics_table is a pandas dataframe containing all the climate metrics of interest across All Time and in the reference and baseline periods.
+* Average, Variance, Maximum, and Minimum Temperatures, over the All-Time Record, Baseline, and Reference periods
+* Dates of the Maxium and Minimum Temperatures for All-Time, Baseline, and Reference Periods
 StationAnalyzer.key_stats is a pandas dataframe containing the statistics of significance about climate change. 
+* The difference between the average temperatures in the Baseline and Reference Periods
+* The recent trend in temperatures over a time period set by the YAML file variable RECENT_TREND_YEARS
+(This trend is calculated using LinearRegression() from sklearn.linear_model)
+* The Statistical Significance of these differences, and accompanying Alpha Values
+
+# Calculation of Statistical Significance
+Two statistical calculations are completed:
+* Comparing the average temperatures in the Baseline and Reference Period. The statistical signifiance
+is calculated using a two-sided t-test (using Python function stats.ttest_ind). 
+The difference is also visualized in a histogram showing the
+temperatures in the baseline and reference periods.
+* The trend in temperatures in the reference period (days) over the most recent RECENT_TREND_YEARS (in the YAML file).
+The significance is calculated using a Pearson's correlation using Pearon's r from scipy.stats.stats.
+This is visualized on the chart of annual change, as a trend line.
+
+For all calculations of statistical signifiance, ALpha is controlled using ALPHA in the YAML file.
+
+#charts
+Three charts are shown
+* Frequency histogram of TMID values in the Reference and Baseline periods.
+* ALl-time Monthly average temperatures.
+* Averages across the Reference period days in every year in the temperature record. ON this chart
+are superimposed the baseline and reference years, and a recent trend over YAML RECENT_TREND_YEARS

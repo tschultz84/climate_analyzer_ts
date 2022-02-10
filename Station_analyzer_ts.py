@@ -45,26 +45,6 @@ class StationAnalyzer :
         self.refststr=refst
         self.refendst=refend
         
-        """This creates an array of annual average temperatures across the entire
-        time period.
-        """
-        yearsout=np.empty([0,2])
-        uniqueyears=np.unique(self.tmid_array[:,0])
-        for year in uniqueyears[:-1]:   
-            #Select only the index values wehre the year is equal to year.
-            index=np.where(self.tmid_array[:,0]==year)
-            #Then, selects data for this year
-            #All columns are pulled, since we have to filter to ensure ther eare 
-            #12 months for every year evaluated. 
-            all_years_data=self.tmid_array[index]
-            
-            #And then evaluates their mean. 
-            all_years_means=np.nanmean(all_years_data[:,4])
-            row=np.array([year,all_years_means])
-            yearsout=np.append(yearsout,[row],axis=0)
-        #Then assigns a variable to the output array.     
-        self.all_years_mean=yearsout
-        
         """These calls create arrays, containing a number of entries in the form
         [year,day of year] which indicates all days in the references and baseline
         periods. 
@@ -78,6 +58,40 @@ class StationAnalyzer :
         #Creatse the actual values of TMID in the periods.
         self.tmid_ref_data=self.tmix_selection(self.refperiod,self.tmid_array)
         self.tmid_base_data=self.tmix_selection(self.baseperiod,self.tmid_array)
+        
+        """This creates an array of  average temperatures across the entire
+        time period.
+        The average is evaluated only over the days provided int he reference period.
+        So if you provide only a month's worth of data, you see only the averages for that
+        month.'
+        """
+        yearsout=np.empty([0,2])
+        #This extracts from tmid_array only the doy present in the reference period.
+        indexer = np.in1d(self.tmid_array[:,3],self.refperiod[:,1])
+        yearsdata=self.tmid_array[indexer]
+        #self.test=yearsdata
+        #uniqueyears=np.unique(yearsdata[:,0])
+        
+        #yearsdata=self.tmid_array
+        uniqueyears=np.unique(yearsdata[:,0])
+        for year in uniqueyears[:-1]:   
+            #Select only the index values wehre the year is equal to year.
+            #index=np.where(self.tmid_array[:,0]==year)
+            index=np.where(yearsdata[:,0]==year)
+            #Then, selects data for this year
+            #All columns are pulled, since we have to filter to ensure ther eare 
+            #12 months for every year evaluated. 
+            all_years_data=yearsdata[index]
+            #all_years_data=self.tmid_array[index]
+            
+            #And then evaluates their mean. 
+            all_years_means=np.nanmean(all_years_data[:,4])
+            row=np.array([year,all_years_means])
+            yearsout=np.append(yearsout,[row],axis=0)
+        #Then assigns a variable to the output array.     
+        self.all_years_mean=yearsout
+        
+        
         
         """#This creates an array with monthyl average temperatures. """
         monthout=np.empty([12,2])
@@ -113,6 +127,10 @@ class StationAnalyzer :
     #This function finds the Day of year, assuming every month has 31 days for simplicity
     #Its input is a pd.DateTime object, it outputs an integer.
     def find_doy(self,pddate):
+        #This function is supposed to be passed a Pandas datetimeIndex.
+        #If it's a string, a conversion is made. 
+        if type(pddate)==str:
+            pddate=pd.DatetimeIndex([pddate])
         doy = pddate.day+(pddate.month-1)*31
         return doy[0]
     
@@ -185,7 +203,8 @@ class StationAnalyzer :
         #Takes the unique days from the refperiod.
         baseline_doy = np.unique(self.refperiod[:,1])
         #Then, all the baseline years.
-        baseline_years = np.unique(self.all_years_mean[:,0])
+        baseline_years = np.unique(self.tmid_array[:,0])
+        #baseline_years = np.unique(self.all_years_mean[:,0])
         #and finally, limits it to the first set of baseline years.
         
         #index1 = np.where(baseline_years == self.yaml['FIRST_BASE_YEAR'])[0]
@@ -418,6 +437,8 @@ class StationAnalyzer :
         #Creates strings describing the range of dates.
         refstr1 = self.date_from_row(self.tmid_ref_data[0])
         refstr2 = self.date_from_row(self.tmid_ref_data[-1])
+        #Just pull out the days. 
+        self.refdays = refstr1[5:]+" to "+refstr2[5:]
         #This creates a dataframe of data points.
         returner = pd.DataFrame(
             {
@@ -525,14 +546,14 @@ class StationAnalyzer :
               
      #This creates several charts of interest.
     def key_charts(self):
-  
+        plt.rcParams['figure.figsize'] = [8, 6]
         
         #Creates a histogram of daily TMID values. 
         ref_hist=self.tmid_ref_data[:,4]
         base_hist=self.tmid_base_data[:,4]
         plt.hist(ref_hist,bins=30,density=True,label="Reference Period", alpha=0.5)
         plt.hist(base_hist,bins=30,density=True,label="Base Period", alpha=0.5)
-        plt.title('Freqency Histogram of TMID over Reference and Base Period')
+        plt.title('Freqency Histogram of Daily TMID over Reference and Base Period')
         plt.xlabel('Fraction of Total at this TMID')
         plt.ylabel('Temperature, F (TMID)')
         plt.legend()
@@ -541,7 +562,7 @@ class StationAnalyzer :
             
         #Creates a plot over one year of the monthyl average TMID temperatures. 
         plt.plot(self.all_months_mean[:,0],self.all_months_mean[:,1])
-        plt.title('Monthly Average of TMID')
+        plt.title('Monthly Average of TMID- All Time Record')
         plt.xlabel('Month')
         plt.ylabel('Monthly Average Temperature, F (TMID)')
         plt.show()
@@ -555,13 +576,22 @@ class StationAnalyzer :
         trend_x = trendline[:,0]
         trend_y = trendline[:,1]
         
-        #Creates a plot over time of the annual average values. 
+        #Creates a plot over time of the  average values. 
+        #This is averaged over all_years_mean, which only includes days in the 
+        #reference period, although for all years.
+        nodays1 = len(np.unique(self.refperiod[:,1]))
+        if nodays1 > 364 :
+            text = "Entire Year"
+        if nodays1 <= 364:
+            text = str(nodays1)+" days in each year"
+        title = "Average Temperature (using TMID) for "+text+" between "+self.refdays+" each year"
         plt.plot(self.all_years_mean[:,0],self.all_years_mean[:,1])
         plt.plot(trend_x,trend_y, color='black',  linestyle='dashed')
+        
         plt.text(np.mean(trend_x),np.mean(trend_y)+1,str('Trend: '+str(round(slope*10,1))+"F/decade"),horizontalalignment='center')
-        plt.title('Annual Average of Monthly TMID')
+        plt.title(title)
         plt.xlabel('Year')
-        plt.ylabel('Annual Average Temperature, F (TMID)')
+        plt.ylabel('Temperature, Farenheit')
         #This creates a span for the baseline which is superimposed on the chart. 
         basespan_min=self.baseperiod[0,0]
         basespan_max=self.baseperiod[-1,0]
