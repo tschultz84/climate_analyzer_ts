@@ -382,7 +382,9 @@ class LoadStation :
             itsgood = False
             if self.display: print("Flag: I need every year of ("+str(thisyear-3)+" to "+str(thisyear)+") - but they are not all not present.")
         #Then, check if there are sufficient years in the recent trend.
-        no_recent = np.shape(np.where(listyears>=thisyear-31))[1]
+        #This is just the number of trend years plus 5.
+        min_trend_years = self.yaml['RECENT_TREND_YEARS'] + 3
+        no_recent = np.shape(np.where(listyears>=thisyear-min_trend_years))[1]
         if no_recent <= self.yaml['REQUIRED_TREND_YEARS']:
             itsgood = False
             if self.display: 
