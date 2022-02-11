@@ -85,6 +85,9 @@ class LoadStation :
                     self.id_closest_station=self.closest_stations.iloc[i][0] 
                     #Lat Longitude.
                     self.st_latlon_str = str(round(self.closest_stations.iloc[i][2],2))+" latitude, "+str(round(self.closest_stations.iloc[i][3],2))+" longitude"
+                    #Latitude, Longitude of the weather station.
+                    self.st_latlon = [self.closest_stations.iloc[i][2],self.closest_stations.iloc[i][3]]
+                    #Miles from reference point.
                     self.miles_from_ref = self.closest_stations.iloc[i][4]
                     if self.display: 
                         

@@ -58,6 +58,7 @@ results for a single weather station, have display=TRUE. If you want to analyze 
 StationLoader is a class. After you run StationLoader, the following object attributes are available.
 * StationLoader.closest_stations is a list of the weather stations closest to the point lat ,lon, values, along with their index numbers, names, locations, and distances from point.
 * StationLoader.name_closest_station and self.id_closest_station are strings that are respectively the name and ID of the closest weather station meeting data requirements (see below) to point. 
+* StationLoader.st_latlon contains the latitude and longitude of the weather station as al ist: [lat,lon]
 * StationLoader.miles_from_ref is the distance, in miles, of the closest weather station meeting data requirements
 * StationLoader.station_data is a Nx7 numpy array that is the key returned attribute of interest. 
 
@@ -86,7 +87,7 @@ It also calculates the TMID values, which is the average of TMAX and TMIN in eve
 
 #  Attributes of StationAnalyzer 
 
-StationAnalyzer.all_years_mean is an Nx2 numpy array. THe firts column is the year. The second is the average of TMID in that year.
+StationAnalyzer.all_years_mean is an Nx2 numpy array. THe firts column is the year. The second is the average of TMID in that year for the days in the chosen reference period.
 StationAnalyzer.tmid_ref_data and StationAnalyzer.tmid_base_data are the daily data values for just the reference and baseline range.
 StationAnalyzer.key_metrics_table is a pandas dataframe containing all the climate metrics of interest across All Time and in the reference and baseline periods.
 * Average, Variance, Maximum, and Minimum Temperatures, over the All-Time Record, Baseline, and Reference periods
