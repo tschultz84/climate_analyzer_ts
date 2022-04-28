@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 
 #This YAML file contains parameters needed to use the load stations and station analyzer functions.
@@ -38,21 +37,14 @@
     #RECENT_TREND_YEARS is the number of years included (starting from the final year in the dataset).
     #in the annual temperature average trendline.  The linear trend is calculated only over this period.
     RECENT_TREND_YEARS : 30
-
+        
     #REQUIRED_TREND_YEARS is minimum number of years required to calculate this trend.
-    #Weather stations without this many years present will be discarded.
     REQUIRED_TREND_YEARS : 25
-    
-    #MIN_RECENT_YEARS is the minimum number of years before he present which must be present
-    #for the statin to be loaded.
-    #if this is 5, and the year is 2022, then every year since 2017 must be present for the weather station to load.
-    #set this to zero to turn this off.
-    MIN_RECENT_YEARS : 5
     
     #MIN_DAYS_PER_MO is the minimum number of dasys of data which must be present
     #for every month of a year for a dataset to be included.
     # If not, then the year is excluded from dataset.
-    MIN_DAYS_PER_MO : 25
+    MIN_DAYS_PER_MO : 20
     
     #ALPHA is the alpha value cmoparing TMID in the reference and baseline period. 
     #Basically if the P Value from the corresponding t-test exceeds this value,
@@ -71,7 +63,3 @@
 #REQUIRED SPECIFICS TO LEAD CSV FILES FROM NOAA WEBSITE
     #Columns to keep from CSV files.
     KEEP_COLS : ['DATE','TMAX','TMIN','TMID']
-
-
-...
-

@@ -40,8 +40,9 @@ The inputs are as follows:
      with these columns: [Year, Month, Day, Day of Year, TMAX, TMIN, TMID]
 """    
 class LoadStation :
-    def __init__(self,point,printudpate=False):
+    def __init__(self,point,printudpate=False,min_days_per_mo=-1):
         
+        self.min_days=min_days_per_mo
         
         self.display=  printudpate   
         #If a point (lat, lon) is passed, then create a point. 
@@ -306,8 +307,11 @@ class LoadStation :
         
         #This defines the minimum number of days of data which msut be present in eveyr month
         #for the year to be included.
-        min_days=self.yaml['MIN_DAYS_PER_MO']
-
+        if self.min_days == -1:
+            min_days=self.yaml['MIN_DAYS_PER_MO']
+        if self.min_days > -1:    
+            min_days=self.min_days
+            
         showme = self.display
 
         #This initializes the "to keep" list -- the list of data to be included.
@@ -379,14 +383,37 @@ class LoadStation :
         #This is a flag field which defaults to TRue, but remains true
         #only if the dataset pasess al checks.
         itsgood=True
+        
+        """
         thisyear = date.today().year
         #Check the latest few years are present.
         if (listyears[-1]!=thisyear) or (listyears[-2]!=thisyear-1) or (listyears[-3]!=thisyear-2):
             itsgood = False
             if self.display: print("Flag: I need every year of ("+str(thisyear-3)+" to "+str(thisyear)+") - but they are not all not present.")
+        """
+        #Ensure the years are sorted, because they do not work otherwise. 
+        listyears=np.sort(listyears)
+        
+        thisyear = date.today().year
+
+        #If MIN_RECENT_YEARS = 0, then the check is skipped entirely.
+        if self.yaml['MIN_RECENT_YEARS'] >0:
+            #This is the value that should be recent in this part of the array, if all years are present. 
+            threshyear=thisyear-self.yaml['MIN_RECENT_YEARS']
+            
+            #But this finds out if the threshyear is actually the right value in the array
+            arbiter = (listyears[-self.yaml['MIN_RECENT_YEARS']-1] - threshyear >= 0)
+            
+            #Check the latest few years are present.
+            #If not, then itsgood is false and the year is bad. 
+            if arbiter == False:
+                itsgood = False
+                print("Flag: I need every year of ("+str(threshyear)+" to "+str(thisyear)+") - but they are not all not present.")
+
+        
         #Then, check if there are sufficient years in the recent trend.
         #This is just the number of trend years plus 5.
-        min_trend_years = self.yaml['RECENT_TREND_YEARS'] + 3
+        min_trend_years = self.yaml['REQUIRED_TREND_YEARS']
         no_recent = np.shape(np.where(listyears>=thisyear-min_trend_years))[1]
         if no_recent <= self.yaml['REQUIRED_TREND_YEARS']:
             itsgood = False

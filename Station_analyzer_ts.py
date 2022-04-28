@@ -518,7 +518,7 @@ class StationAnalyzer :
         key_stats = pd.DataFrame(
             {
                 "Metric":
-                    ["Reference Minus Basline Temperature Change",
+                    ["Reference Minus BasEline Temperature Change",
                      str(self.yaml['RECENT_TREND_YEARS'])+ " year warming trend"
                      ],
              "Value":
