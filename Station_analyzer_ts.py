@@ -2,7 +2,6 @@
 
 import pandas as pd
 import sys
-import yaml
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as stats
@@ -12,23 +11,22 @@ from IPython.display import display_html
 
 
 #All analysis fucntions for a station are done in this object.
-#The input is stationdata, which shoudl be self.station_data from the StationLoad object
+#The input is stationobj, which is an object output from the Station_Loader_ts object
 #the refst and refend are both strings, marking the beginning and end of the reference period of analysis
+#alpha is the alpha value (p-value threshold determining statistical signifiance)
 
 #display prints the function outputs
 
 class StationAnalyzer :
-    def __init__(self,stationdata,refst='2020-01-31',refend='2020-12-31',display=True):
-        
+    def __init__(self,stationobj,refst='2020-01-31',refend='2020-12-31',display=True,alpha=0.01):
+        #Initialize some variables.
+        self.alpha=alpha
         self.display=display
-        #This YAML file contains a great deal of static information, 
-        #such as directory information. 
-       # yaml_dir="C:\\Users\\14154\\OneDrive\\Python\\climate_mapper\\python\\climate_analyzer_ts\\"
-        yaml_file = open("load_stats_static.yaml")
-        self.yaml = yaml.load(yaml_file, Loader=yaml.FullLoader)
+        self.stationobj = stationobj
+        
     
         #Creating the assigned value containing every single element. 
-        self.all_data_long=stationdata
+        self.all_data_long=stationobj.station_data
         #Then assigning off TMID, TMIN, and TMAX values, which are different
         #columns of the input data.
         self.tmid_array = self.all_data_long[:,[0,1,2,3,6]]
@@ -207,11 +205,10 @@ class StationAnalyzer :
         #baseline_years = np.unique(self.all_years_mean[:,0])
         #and finally, limits it to the first set of baseline years.
         
-        #index1 = np.where(baseline_years == self.yaml['FIRST_BASE_YEAR'])[0]
-        index = np.where(baseline_years <= self.yaml['LAST_BASE_YEAR'])[0]
-        index = np.where(baseline_years[index] >= self.yaml['FIRST_BASE_YEAR'])[0]
+        
+        index = np.where(baseline_years <= self.stationobj.station_filters['Last Year of Baseline'])
+        index = np.where(baseline_years[index] >= self.stationobj.station_information['Earliest year in station record'])
         baseline_years=baseline_years[index]
-        #baseline_years=baseline_years[0:self.yaml['BASENOYEARS']]
         
         #Then, create an array which contains all of the elemnts. 
         #THe first column are the years.
@@ -329,7 +326,7 @@ class StationAnalyzer :
         if (array != False) & (array != True):
             array = True
         #First, format, and take only the recent years of data.
-        recentyears=self.yaml['RECENT_TREND_YEARS']
+        recentyears=30 #Using 30 years for the trend.
         x = yearsdata[-recentyears:,0].reshape(-1,1)
         y = yearsdata[-recentyears:,1]
         #This statement creates the variable model as the instance of LinearRegression. 
@@ -479,25 +476,25 @@ class StationAnalyzer :
         
        # print("The Ref period is "+str(int((ref_tmid_mean-base_tmid_mean)*100)/100)+"F warmer than your base period.")
        # print("Is this difference statistically different, ")
-        #print(" with a probability that this occured by chance less than "+str(self.yaml['ALPHA']))
-        #print(" i.e., alpha is "+str(self.yaml['ALPHA'])+str("?"))
+        #print(" with a probability that this occured by chance less than "+str(self.alpha))
+        #print(" i.e., alpha is "+str(self.alpha)+str("?"))
      
-        if pvalue >= self.yaml['ALPHA']:
+        if pvalue >= self.alpha:
            #print("No.")
            self.ref_stat_sig = False
-        if pvalue < self.yaml['ALPHA']:
+        if pvalue < self.alpha:
            #print("Yes.") 
            self.ref_stat_sig = True
 
         trend_data = self.create_trend_line(self.all_years_mean,False)
-        #print("The warming trend over the past "+str(self.yaml['RECENT_TREND_YEARS'])+" is: "+str(trend_data[0]*10)+" F degrees per decade.")
+        
         #This creates a variable to pull out the warming, in F per decade.
         self.trend_data_str=str(round(trend_data[0][0]*10,2))+" Farenheit per decade"
         #This calculates the correlation coefficient and accompanying p-value
         #which states whether this correlation is statistically significant. 
         
         #First, format, and take only the recent years of data.
-        recentyears=self.yaml['RECENT_TREND_YEARS']
+        recentyears=30 #using 30 years in the trend.
         x5 = self.all_years_mean[-recentyears:,0]
         y5 = self.all_years_mean[-recentyears:,1]
         
@@ -506,9 +503,9 @@ class StationAnalyzer :
        # print("Outcome of Pearson Correlation Coefficient Analysis: ")
        # print("Coefficient of Correlation (R): "+str(pearsond1[0]))
        # print("Accompanying P value: "+str(100*pearsond1[1]))
-        if pearsond1[1] < self.yaml['ALPHA']:
+        if pearsond1[1] < self.alpha:
             is_real = True
-        if pearsond1[1] >= self.yaml['ALPHA']:
+        if pearsond1[1] >= self.alpha:
             is_real = False
        # print("Is this trened real using Pearson correlation analysis? "+str(is_real))
         #Variables to pull out.
@@ -519,7 +516,7 @@ class StationAnalyzer :
             {
                 "Metric":
                     ["Reference Minus BasEline Temperature Change",
-                     str(self.yaml['RECENT_TREND_YEARS'])+ " year warming trend"
+                     str(30)+ " year warming trend"
                      ],
              "Value":
                  [str(int((ref_tmid_mean-base_tmid_mean)*100)/100)+ "F",
@@ -531,8 +528,8 @@ class StationAnalyzer :
                      [self.ref_stat_sig,
                       self.trend_is_real],
                      "Alpha Value":
-                         [self.yaml['ALPHA'],
-                          self.yaml['ALPHA']]
+                         [self.alpha,
+                          self.alpha]
                 
                 }
         )
