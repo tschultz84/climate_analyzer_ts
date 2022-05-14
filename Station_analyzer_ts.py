@@ -16,9 +16,24 @@ from IPython.display import display_html
 #alpha is the alpha value (p-value threshold determining statistical signifiance)
 
 #display prints the function outputs
+import json
+import os
+import Station_Loader_ts as load
 
 class StationAnalyzer :
-    def __init__(self,stationobj,refst='2020-01-31',refend='2020-12-31',display=True,alpha=0.01):
+    def __init__(self,point,refst="2020-01-31",refend="2020-12-31",display=True,alpha=0.01):
+        #Load the weather station. 
+        #You need to clean this up some - the whole loader file should be in this directory for simplicity. 
+        #f = open('directories.json') #Open the JSON file. 
+        #directory_names = json.load(f)
+        #climate_analyzer_dir = directory_names['climate_analyzer_dir'] #And where the analyzer package is located. 
+        #climate_loader_dir = directory_names['climate_loader_dir'] #This is where the climate_loader_ts package is located.
+
+        #os.chdir(climate_loader_dir)
+        
+        #os.chdir(climate_analyzer_dir) #Switch back to the analyzer root package once all is said and done.
+        stationobj=load.LoadStation(point)
+
         #Initialize some variables.
         self.alpha=alpha
         self.display=display
@@ -29,9 +44,9 @@ class StationAnalyzer :
         self.all_data_long=stationobj.station_data
         #Then assigning off TMID, TMIN, and TMAX values, which are different
         #columns of the input data.
-        self.tmid_array = self.all_data_long[:,[0,1,2,3,6]]
-        self.tmin_array = self.all_data_long[:,[0,1,2,3,5]]
-        self.tmax_array = self.all_data_long[:,[0,1,2,3,4]]
+        self.tmid_array = self.all_data_long[:,[0,1,2,3,6,7]]
+        self.tmin_array = self.all_data_long[:,[0,1,2,3,5,7]]
+        self.tmax_array = self.all_data_long[:,[0,1,2,3,4,7]]
         
         #This then creates the yearly averages.
         #First, find the beginning and end years, and the number of years total.
@@ -67,14 +82,10 @@ class StationAnalyzer :
         #This extracts from tmid_array only the doy present in the reference period.
         indexer = np.in1d(self.tmid_array[:,3],self.refperiod[:,1])
         yearsdata=self.tmid_array[indexer]
-        #self.test=yearsdata
-        #uniqueyears=np.unique(yearsdata[:,0])
         
-        #yearsdata=self.tmid_array
         uniqueyears=np.unique(yearsdata[:,0])
         for year in uniqueyears[:-1]:   
             #Select only the index values wehre the year is equal to year.
-            #index=np.where(self.tmid_array[:,0]==year)
             index=np.where(yearsdata[:,0]==year)
             #Then, selects data for this year
             #All columns are pulled, since we have to filter to ensure ther eare 
@@ -121,16 +132,6 @@ class StationAnalyzer :
     The following set of functions make various transformations on data
     and create new arrays in order to complete various analyses.
     """  
-        
-    #This function finds the Day of year, assuming every month has 31 days for simplicity
-    #Its input is a pd.DateTime object, it outputs an integer.
-    def find_doy(self,pddate):
-        #This function is supposed to be passed a Pandas datetimeIndex.
-        #If it's a string, a conversion is made. 
-        if type(pddate)==str:
-            pddate=pd.DatetimeIndex([pddate])
-        doy = pddate.day+(pddate.month-1)*31
-        return doy[0]
     
     #This function creates beginning and end dates for two different pd datetimeIndex
     #objects, and creates a range of days, int he form of [[Year1,Day of Year1],[Year1,DOY2],...]
@@ -145,55 +146,24 @@ class StationAnalyzer :
         if type(pddate2)==str:
             pddate2=pd.DatetimeIndex([pddate2])
         
-        #First, create simple forms of the Day of year and Year. 
-        doy1 = self.find_doy(pddate1)
-        doy2 = self.find_doy(pddate2)
-        year1=pddate1.year[0]
-        year2=pddate2.year[0]
-        #This simply throws an error if the years are not ordered properly.   
-        if year1>year2:        
-          print("Your reference period is improperly defined.")
-          print("THe first year must be before the second year.")
-          sys.exit("Break Error due to bad dates. .")
-        #First, define if the reference period beginning and end are in the same eyar. 
-        if year1==year2:
-            #Raise an exception if the reference period end is before the beginning.
-            if doy1>doy2:
-                
-                print("Your reference period is improperly defined.")
-                print("THe first date must be before the second date.")
-                sys.exit("Break Error due to bad dates. .")
-            #But if the beginning and end are in the same year, then the array is very simple, 
-            #jsut each row corresonding to the same year,
-            #with a year and Day of Year.
-            alldays = np.arange(doy1,doy2+1)
-            #allyears = year1
-            returner = np.transpose(np.array([np.repeat(year1,len(alldays)),alldays]))
-            
-        #If year1 is before year2, the array is filled with day of year valuse
-        #that include all days in the year. 
-        if year1 < year2:
-            #This prints a message, indicating that reference periods including mroe than one year
-            #include the entire period of time.
-            print("You included more than one year in the reference period.")
-            print("The analysis will include all days in each year included.")
-            print("In order to avoid seasonal bias, I have to average over the entire year.")
-            print("For example if you entered 2020 Jan 1 to 2021 July 1 as a reference,")
-            print("this biases your result to be much warmer than average years")
-           
-           #Define the returned array, which is empty.
-            returner = np.empty([0,2])
-            #First, define all the days in the list, which includes all days in the year
-            dayskarr = np.arange(1,372+1)
-            #for k in np.arange(year1+1,year2):
-            for k in np.arange(year1,year2+1):
-                #Then, over all years in between year 1 and year 2, create a new array
-                #This one has DOY from 1 to 372 and every year in the intermediate period.               
-                yearkarr = np.transpose(np.array([np.repeat(k,len(dayskarr)),dayskarr]))
-                #This then appends to returner this array.
-                returner = np.append(returner,yearkarr,axis=0)    
-       
-        return returner    
+        #Convert to Julian Dates, which simplifies everything. 
+        day1_julian=pddate1.to_julian_date()
+        day2_julian=pddate2.to_julian_date()
+
+        #This simply throws an error if the dates are not ordered properly.   
+        if day1_julian=>day2_julian:        
+          print("Your period dates is improperly defined.")
+          print("THe first date must be before the second date.")
+          sys.exit("Break Error due to bad dates.")
+
+        #Create the output array by looping over the whole reference period.
+        range_julian=np.arange(day1_julian,day2_julian+1,1)
+        ranger=[]
+        for day in range_julian:
+            ranger = ranger+[day.dt.year,day.dt.day_of_year]
+        ranger = np.asarray(ranger)
+ 
+        return ranger    
     
     #This then finds the Days of Year for the analyzed baseline period, using
     #the same days of year as the reference period, to ensure the comparison is fair.
