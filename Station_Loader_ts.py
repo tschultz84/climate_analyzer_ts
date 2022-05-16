@@ -285,12 +285,12 @@ class LoadStation :
         returner[threetemps] = (returner[threetemps]*9/5)+32
         
         #Create dates columns appropriately.
-        returner['DATE']=pd.DatetimeIndex(returner['DATE'])
+        returner['DATE']=pd.to_datetime(returner['DATE'])
         returner['Year']=returner["DATE"].dt.year
         returner['Month']=returner["DATE"].dt.month
         returner['Day']=returner["DATE"].dt.day
         returner['DOY'] = returner['DATE'].dt.day_of_year
-        returner['Julian Date'] = returner['DATE'].to_julian_date() 
+        returner['Julian Date'] = pd.DatetimeIndex(returner['DATE']).to_julian_date() 
         
         #Removes the DATE column, which is now redudant.
         returner = returner.drop(['DATE'],axis=1)
