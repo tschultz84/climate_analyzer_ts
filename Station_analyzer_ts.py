@@ -37,20 +37,19 @@ class StationAnalyzer :
         #Then assigning off TMID, TMIN, and TMAX values, which are different
         #columns of the input data.
         self.tmid_array = self.all_data_long[:,[0,1,2,3,6,7]]
-        self.tmin_array = self.all_data_long[:,[0,1,2,3,5,7]]
-        self.tmax_array = self.all_data_long[:,[0,1,2,3,4,7]]
+        
         
         #Initializes the reference dates. It initializes the reference period to 2015-1-1 to 2020-12-31.
         self.change_ref_dates([2015,2020])
         
         #Runs the key_metrics function if desired.
-        #if self.display==True:
+        if self.display==True:
             #Generate variables. 
-            #self.key_metrics()
+            self.key_metrics()
             #show everything in a nice format. 
-            #display_html(self.key_metrics_table)
-            #display_html(self.key_stats)
-            #self.key_charts()
+            display_html(self.key_metrics)
+            display_html(self.key_stats)
+            self.key_charts()
                 
     #BEGIN FUNCTIONS
     """
@@ -80,25 +79,49 @@ class StationAnalyzer :
         print(f"Period Subset Included: {self.ref_date_1.month}-{self.ref_date_1.day} to {self.ref_date_2.month}-{self.ref_date_2.day}.")
         
         #Regenerate the new periods of interest. 
-        self.refperiod=self.find_time_range(ref=True) #Creating the arrayed reference period. 
-        self.baseperiod = self.find_time_range(ref=False)  #creates baseline range.
+        self.refperiod_all=self.find_time_range(ref=True) #Creating the arrayed reference period. 
+        self.baseperiod_all = self.find_time_range(ref=False)  #creates baseline range.
+        self.refperiod=self.refperiod_all[:,0] #Just select Julian Dates.
+        self.baseperiod=self.baseperiod_all[:,0] #Just select Julian Dates.
+
+        #Creates strings describing the range of dates. 
+        firstmonthr=self.ref_date_1.month
+        firstdayr=self.ref_date_1.day
+        lastmonthr=self.ref_date_2.month
+        lastdayr=self.ref_date_2.day
+        firstyearr=self.refperiod_all[0,1].year
+        lastyearr=self.refperiod_all[-1,1].year   
+        
+        refstring = f"{firstmonthr}-{firstdayr} to {lastmonthr}-{lastdayr} in {firstyearr} to {lastyearr}" #Generate the string. 
+        basestring = f"{firstmonthr}-{firstdayr} to {lastmonthr}-{lastdayr} in {self.baseperiod_all[0,1].year} to {self.baseperiod_all[-1,1].year}"#Generate the string. 
+
+        #Creates strings describing the range of dates.
+        alltimedates1,alltimedates2=self.tmid_array[0][0:3].astype(int),self.tmid_array[-1][0:3].astype(int)
+        alltimestr1 = f"{alltimedates1[0]}-{alltimedates1[1]}-{alltimedates1[2]}"
+        alltimestr2 = f"{alltimedates2[0]}-{alltimedates2[1]}-{alltimedates2[2]}"
 
         #Create a series summarizing information.
         self.period_information=pd.Series(data={
-            "Reference Period Start":self.ref_date_1,
-            "Reference Period End":self.ref_date_2,
-            "Reference Period Start (Julian)":self.ref_date_1.to_julian_date(),
-            "Reference Period End (Julian)":self.ref_date_2.to_julian_date(),
+            "All Time Period Description":alltimestr1+" to "+alltimestr2,
+            "Reference Period Start":self.refperiod_all[0,1],
+            "Reference Period End":self.refperiod_all[-1,1],
+            "Reference Period Description":refstring,
+            "Baseline Period Start":self.baseperiod_all[0,1],
+            "Baseline Period End":self.baseperiod_all[-1,1],
+            "Baseline Period Description":basestring,
+            "First Date in Subannual Reference Period Analysis":self.ref_date_1,
+            "Last Date in Subannual Reference Period Analysis":self.ref_date_2,
             "First Unique DOY in Reference Period":self.ref_date_1.day_of_year,
             "Last Unique DOY in Reference Period":self.ref_date_2.day_of_year
         })
+
         
         #Creates the actual values of TMID in the periods.
         self.tmid_ref_data=self.tmix_selection(self.refperiod,self.tmid_array)
         self.tmid_base_data=self.tmix_selection(self.baseperiod,self.tmid_array)
         self.all_years_mean=self.alltime_ref_annual_averages()
         self.all_months_mean = self.alltime_annual_monthly_averages()
-        print(f"I re-generated the baseline and reference period datasets accordingly. Their respective shapes: {self.tmid_ref_data.shape} and {self.tmid_base_data.shape}.")
+        print(f"I re-generated the reference and baseline period datasets accordingly. Their respective shapes: {self.tmid_ref_data.shape} and {self.tmid_base_data.shape}.")
 
     #This function creates beginning and end dates for two different pd datetimeIndex
     #objects, and creates a range of days, in the form of [Julian_date_1,Julian_date_2, etc...]
@@ -117,10 +140,11 @@ class StationAnalyzer :
         doy_1, doy_2 = self.ref_date_1.day_of_year, self.ref_date_2.day_of_year
             
         #Create the output array by looping over the whole reference period.
-        return_arr = np.empty([0,1]) #Create an initialize array. 
+        return_arr = np.empty([0,2]) #Create an initialize array. 
         for year in np.arange(year_1,year_2+1): #Loop over all years.
             for day in np.arange(doy_1,doy_2+1): #Loop over all Days of Year. 
-                arr=np.array([pd.to_datetime(f"{int(year)}-{int(day)}",format="%Y-%j").to_julian_date()])
+                date_timestamp=pd.to_datetime(f"{int(year)}-{int(day)}",format="%Y-%j")
+                arr=np.array([date_timestamp.to_julian_date(),date_timestamp])
                 return_arr = np.append(return_arr,[arr],axis=0)
         
         return return_arr 
@@ -276,7 +300,10 @@ class StationAnalyzer :
     #This creates a table (pd dataframe) of the key metrics of interest
     def key_metrics(self):       
         #ALL TIME METRICS -- first finds the metrics o
-                   
+        #Define the TMIN and TMAX datasets. 
+        self.tmin_array = self.all_data_long[:,[0,1,2,3,5,7]]
+        self.tmax_array = self.all_data_long[:,[0,1,2,3,4,7]]
+
         #This then calculates the mean over the ref and baseline periods. 
         ref_tmid_mean=np.nanmean(self.tmid_ref_data[:,4])
         base_tmid_mean=np.nanmean(self.tmid_base_data[:,4])
@@ -288,76 +315,35 @@ class StationAnalyzer :
         
         bmaxdata = self.tmix_selection(self.baseperiod, self.tmax_array)
         bmindata = self.tmix_selection(self.baseperiod, self.tmin_array)
-        #Then, calcualte max and min. 
-        ref_max=np.nanmax(refmaxdata[:,4])
-        base_max=np.nanmax(bmaxdata[:,4])
-        ref_min=np.nanmin(refmindata[:,4])
-        base_min=np.nanmin(bmindata[:,4])
-        #Then, find max and min dates.
-        rmaxdate = self.find_max_min_info(refmaxdata)
-        rmindate = self.find_max_min_info(refmindata,MAX=False)
-        bmaxdate = self.find_max_min_info(bmaxdata)
-        bmindate = self.find_max_min_info(bmindata,MAX=False)
-        
-
-        #Creates strings describing the range of dates.
-        alltimedates1,alltimedates2=self.tmid_array[0][0:3].astype(int),self.tmid_array[-1][0:3].astype(int)
-        alltimestr1 = f"{alltimedates1[0])}-{alltimedates1[1])}-{alltimedates1[2])}"
-        alltimestr2 = f"{alltimedates2[0])}-{alltimedates2[1])}-{alltimedates2[2])}"
-        
-        #Creates strings describing the range of dates. 
-        firstdayr,lastdayr=self.tmid_ref_data[0][0:3],self.tmid_ref_data[-1][0:3] #Find the year and days of year of the first and last entry in Reference period..
-        self.refstring = f"{firstdayr[1]}-{firstdayr[2]} to {lastdayr[1]}-{lastdayr[2]} in {firstdayr[0]} to {lastdayr[0]}" #Generate the string. 
-        firstdayb,lastdayb=self.tmid_base_data[0][0:3],self.tmid_base_data[-1][0:3] #Find the year and days of year of the first and last entry in baseline period.
-        basestring = f"{firstdayb[1]}-{lastdayb[2]} to {lastdayb[1]}-{lastdayb[2]} in {firstdayb[0]} to {lastdayb[0]}"#Generate the string. 
-
-        #Just pull out the days. 
-        #self.refdays = refstr1[5:]+" to "+refstr2[5:]
+                
         #This creates a dataframe of data points.
         returner = pd.DataFrame(
             {
              "Analysis Timeframe":["All Time","Reference Period","Baseline Period"],
-             "Time Period Covered":[alltimestr1+" to "+alltimestr2,self.refstring,basestring],
+             "Time Period Covered":[self.period_information["All Time Period Description"],
+                                        self.period_information['Reference Period Description'],
+                                        self.period_information['Baseline Period Description']],
 
-                "Average TMID over period (F)":[np.nanmean(self.tmid_array[:,4]),ref_tmid_mean,base_tmid_mean],
-                "Variance of TMID over period (F)":[np.nanvar(self.tmid_array[:,4]),np.nanvar(self.tmid_ref_data[:,4]),np.nanvar(self.tmid_base_data[:,4])],
-                
-                "Maximum Temperature over period (F)":[np.nanmax(self.tmax_array[:,4]),ref_max,base_max],
-                "Date of Maximum Temperature":[self.find_max_min_info(self.tmax_array),rmaxdate,bmaxdate],
-                "Minimum Temperature over period (F)":[np.nanmin(self.tmin_array[:,4]),ref_min,base_min],
-                "Date of Minimum Temperature":[self.find_max_min_info(self.tmin_array,MAX=False),rmindate,bmindate],      
+                "TMID Average (F) Over Entire period":[np.nanmean(self.tmid_array[:,4]),ref_tmid_mean,base_tmid_mean], 
+                "Max. Temp. (F) over period":[np.nanmax(self.tmax_array[:,4]),np.nanmax(refmaxdata[:,4]),np.nanmax(bmaxdata[:,4])],
+                "Date of Max. Temperature":[self.find_max_min_info(self.tmax_array),self.find_max_min_info(refmaxdata),self.find_max_min_info(bmaxdata)],
+                "Min. Temp. (F) over period":[np.nanmin(self.tmin_array[:,4]),np.nanmin(refmindata[:,4]),np.nanmin(bmindata[:,4])],
+                "Date of Min. Temperature":[self.find_max_min_info(self.tmin_array,MAX=False),self.find_max_min_info(refmindata,MAX=False),self.find_max_min_info(bmindata,MAX=False)],      
              }
             )
         
-        ##THese are key values to return out of the function.
-        #You can grab these via the object handle. 
-        self.alltimestr =alltimestr1+" to "+alltimestr2
-        
-        #self.whole_max_info = [whole_tmax,maxdate]
-        #self.whole_min_info = [ whole_tmin,mindate]
-        #self.ref_max_info = [ref_max,rmaxdate]
-        #self.ref_min_info = [ref_min,rmindate]
-        
-        
         t_test = self.do_t_test()
-        #print("T Test Finding:")
-        #print(t_test)
         pvalue = t_test[1]
         
         #First, create a string pulling out the difference between reference and baseline.
         self.ref_base_delta = str(int((ref_tmid_mean-base_tmid_mean)*100)/100)
-        #And the same with the pvalue.
-        self.ref_pvalue = pvalue
+       
              
-        if pvalue >= self.alpha:
-           self.ref_stat_sig = False
-        if pvalue < self.alpha:
-           self.ref_stat_sig = True
+        if pvalue >= self.alpha: ref_stat_sig = False
+        if pvalue < self.alpha: ref_stat_sig = True
 
         trend_data = self.create_trend_line(self.all_years_mean,False)
         
-        #This creates a variable to pull out the warming, in F per decade.
-        self.trend_data_str=str(round(trend_data[0][0]*10,2))+" Farenheit per decade"
         #This calculates the correlation coefficient and accompanying p-value
         #which states whether this correlation is statistically significant. 
         
@@ -368,38 +354,21 @@ class StationAnalyzer :
         
         pearsond1 = pearsonr(x5,y5)
        
-        if pearsond1[1] < self.alpha:
-            is_real = True
-        if pearsond1[1] >= self.alpha:
-            is_real = False
+        if pearsond1[1] < self.alpha:  is_real = True
+        if pearsond1[1] >= self.alpha:  is_real = False
        
-        #Variables to pull out.
-        self.trend_p = pearsond1[1]
-        self.trend_is_real = is_real
         #This creates a dataframe of statistical information points.
         key_stats = pd.DataFrame(
             {
-                "Metric":
-                    ["Reference Minus BasEline Temperature Change",
-                     str(30)+ " year warming trend"
-                     ],
-             "Value":
-                 [str(int((ref_tmid_mean-base_tmid_mean)*100)/100)+ "F",
-                 self.trend_data_str ],
-             "P-Value of Difference":
-                 [self.ref_pvalue,
-                  self.trend_p],
-                 "Statistically Significant?":
-                     [self.ref_stat_sig,
-                      self.trend_is_real],
-                     "Alpha Value":
-                         [self.alpha,
-                          self.alpha]
-                
+                "Metric": ["Ref Minus Baseline Temperature Change", f"{30} year warming trend"],
+             "Value":[f"{int((ref_tmid_mean-base_tmid_mean)*100)/100} F", f"{round(trend_data[0][0]*10,2)} Farenheit per decade" ],
+             "P-Value of Difference": [pvalue, pearsond1[1]],
+                 "Statistically Significant?": [ref_stat_sig,is_real],
+                     "Alpha Value": [self.alpha, self.alpha]
                 }
         )
                 
-        self.key_metrics_table =returner
+        self.key_metrics =returner
         self.key_stats = key_stats
         return returner   
     
@@ -419,7 +388,6 @@ class StationAnalyzer :
         plt.ylabel('Temperature, F (TMID)')
         plt.legend()
         plt.show()
-        
             
         #Creates a plot over one year of the monthyl average TMID temperatures. 
         plt.plot(self.all_months_mean[:,0],self.all_months_mean[:,1])
@@ -445,7 +413,7 @@ class StationAnalyzer :
             text = "Entire Year"
         if nodays1 <= 364:
             text = str(nodays1)+" days in each year"
-        title = "Average Temperature (using TMID) for "+text+" between "+self.refstring
+        title = "Average Temperature (using TMID) for "+text+" between "+self.period_information['Reference Period Description']
         plt.plot(self.all_years_mean[:,0],self.all_years_mean[:,1])
         plt.plot(trend_x,trend_y, color='black',  linestyle='dashed')
         
@@ -467,5 +435,3 @@ class StationAnalyzer :
         plt.text((refspan_min + refspan_max)/2,np.nanmin(self.all_years_mean[:,1]),'Reference',horizontalalignment='center')
         
         plt.show()
-
-        
