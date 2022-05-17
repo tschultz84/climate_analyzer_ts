@@ -32,7 +32,6 @@ class StationAnalyzer :
         self.display=display
         self.stationobj = stationobj
         
-    
         #Creating the assigned value containing every single element. 
         self.all_data_long=stationobj.station_data
         #Then assigning off TMID, TMIN, and TMAX values, which are different
@@ -41,74 +40,21 @@ class StationAnalyzer :
         self.tmin_array = self.all_data_long[:,[0,1,2,3,5,7]]
         self.tmax_array = self.all_data_long[:,[0,1,2,3,4,7]]
         
-        #This then creates the yearly averages.
-        #First, find the beginning and end years, and the number of years total.
-        self.alltime_startyear=np.nanmin(self.tmax_array[:,0])
-        self.alltime_endyear=np.nanmax(self.tmax_array[:,0])
-        self.alltime_number_years=self.alltime_endyear-self.alltime_startyear
-        
         #Initializes the reference dates. It initializes the reference period to 2015-1-1 to 2020-12-31.
         self.change_ref_dates([2015,2020])
-            
-        """
-        
-        This creates an array of  average temperatures across the entire
-        time period.
-        The average is evaluated only over the days provided int he reference period.
-        So if you provide only a month's worth of data, you see only the averages for that
-        month.'
-        
-        yearsout=np.empty([0,2])
-        #This extracts from tmid_array only the doy present in the reference period.
-        indexer = np.in1d(self.tmid_array[:,3],self.refperiod[:,1])
-        yearsdata=self.tmid_array[indexer]
-        
-        uniqueyears=np.unique(yearsdata[:,0])
-        for year in uniqueyears[:-1]:   
-            #Select only the index values wehre the year is equal to year.
-            index=np.where(yearsdata[:,0]==year)
-            #Then, selects data for this year
-            #All columns are pulled, since we have to filter to ensure ther eare 
-            #12 months for every year evaluated. 
-            all_years_data=yearsdata[index]
-            #all_years_data=self.tmid_array[index]
-            
-            #And then evaluates their mean. 
-            all_years_means=np.nanmean(all_years_data[:,4])
-            row=np.array([year,all_years_means])
-            yearsout=np.append(yearsout,[row],axis=0)
-        #Then assigns a variable to the output array.     
-        self.all_years_mean=yearsout
-        
-        #This creates an array with monthyl average temperatures. 
-        monthout=np.empty([12,2])
-        for month in np.arange(1,13):
-            
-            #Select only the index values wehre the month is equal to month. 
-            index=np.where(self.tmid_array[:,1]==month)
-            #Then, selects values for this month
-            all_months_data=self.tmid_array[index,4]
-            #And evaluates their mean. 
-            all_months_means=np.nanmean(all_months_data)
-            monthout[month-1,0]=month
-            monthout[month-1,1]=all_months_means
-        self.all_months_mean=monthout
         
         #Runs the key_metrics function if desired.
-        if self.display==True:
+        #if self.display==True:
             #Generate variables. 
-            self.key_metrics()
+            #self.key_metrics()
             #show everything in a nice format. 
-            display_html(self.key_metrics_table)
-            display_html(self.key_stats)
-            self.key_charts()
-            
-        """    
-    
+            #display_html(self.key_metrics_table)
+            #display_html(self.key_stats)
+            #self.key_charts()
+                
     #BEGIN FUNCTIONS
-    
-    
-    """DATA CLEANING AND WRANGLING FUNCTIONS
+    """
+    DATA CLEANING AND WRANGLING FUNCTIONS
     The following set of functions make various transformations on data
     and create new arrays in order to complete various analyses.
     """  
@@ -117,7 +63,7 @@ class StationAnalyzer :
     #then date_series, list of [[month, day],[month, day]] which is the beginning and end of a subannual reference.
     #If date_series != list, then it assumes the beginning and end are the whole year.
     def change_ref_dates(self,year_series,date_series=-1):
-        #date_series is not a list, then set the date differently.
+        #If date_series is not a list, then set the date differently.
         if type(date_series)!=list:
             date_series = [[1,1],[12,31]] #Set to the entire year.
         
@@ -125,14 +71,9 @@ class StationAnalyzer :
         self.ref_date_1=pd.to_datetime(f"{year_series[0]}-{date_series[0][0]}-{date_series[0][1]}")
         self.ref_date_2=pd.to_datetime(f"{year_series[1]}-{date_series[1][0]}-{date_series[1][1]}")
 
-        #Convert to Julian Dates, which simplifies everything. 
-        self.ref_date_1_julian=self.ref_date_1.to_julian_date()
-        self.ref_date_2_julian=self.ref_date_2.to_julian_date()
-
         #This simply throws an error if the dates are not ordered properly.
-        if self.ref_date_1_julian>self.ref_date_2_julian:        
+        if self.ref_date_1.to_julian_date()>self.ref_date_2.to_julian_date():        
             print("Your period dates are improperly defined. The first date must be before the second date.")
-            print("I am re-ordering them accordingly.")
             sys.exit("Break Error due to bad dates.")
         print(f"Reference dates have been re-defined.")
         print(f"Years: {self.ref_date_1.year} to {self.ref_date_2.year}.")
@@ -141,14 +82,26 @@ class StationAnalyzer :
         #Regenerate the new periods of interest. 
         self.refperiod=self.find_time_range(ref=True) #Creating the arrayed reference period. 
         self.baseperiod = self.find_time_range(ref=False)  #creates baseline range.
+
+        #Create a series summarizing information.
+        self.period_information=pd.Series(data={
+            "Reference Period Start":self.ref_date_1,
+            "Reference Period End":self.ref_date_2,
+            "Reference Period Start (Julian)":self.ref_date_1.to_julian_date(),
+            "Reference Period End (Julian)":self.ref_date_2.to_julian_date(),
+            "First Unique DOY in Reference Period":self.ref_date_1.day_of_year,
+            "Last Unique DOY in Reference Period":self.ref_date_2.day_of_year
+        })
         
         #Creates the actual values of TMID in the periods.
         self.tmid_ref_data=self.tmix_selection(self.refperiod,self.tmid_array)
         self.tmid_base_data=self.tmix_selection(self.baseperiod,self.tmid_array)
+        self.all_years_mean=self.alltime_ref_annual_averages()
+        self.all_months_mean = self.alltime_annual_monthly_averages()
         print(f"I re-generated the baseline and reference period datasets accordingly. Their respective shapes: {self.tmid_ref_data.shape} and {self.tmid_base_data.shape}.")
 
     #This function creates beginning and end dates for two different pd datetimeIndex
-    #objects, and creates a range of days, in the form of [[Year1,Day of Year1],[Year1,DOY2],...]
+    #objects, and creates a range of days, in the form of [Julian_date_1,Julian_date_2, etc...]
     #It automatically does this based on the the baseline and reference periods. 
     #The 2nd argument, reference, just defines if the range is in the baseline or not.
     def find_time_range(self,ref=True):
@@ -159,48 +112,74 @@ class StationAnalyzer :
         if ref!=True: #If not True, then use the baseline period.
             begdate= self.stationobj.station_information['Earliest year in station record']
             enddate = self.stationobj.station_filters["Last Year of Baseline"]
-            year_1,year_2=pd.to_datetime(begdate).year,pd.to_datetime(enddate).year
+            year_1,year_2=pd.to_datetime(begdate,format="%Y").year,pd.to_datetime(enddate,format="%Y").year
         #The days of year are the same in both analyses
         doy_1, doy_2 = self.ref_date_1.day_of_year, self.ref_date_2.day_of_year
             
         #Create the output array by looping over the whole reference period.
-        return_arr = np.empty([0,2]) #Create an initialize array. 
+        return_arr = np.empty([0,1]) #Create an initialize array. 
         for year in np.arange(year_1,year_2+1): #Loop over all years.
             for day in np.arange(doy_1,doy_2+1): #Loop over all Days of Year. 
-                arr = np.array([year,day])
+                arr=np.array([pd.to_datetime(f"{int(year)}-{int(day)}",format="%Y-%j").to_julian_date()])
                 return_arr = np.append(return_arr,[arr],axis=0)
- 
-        return return_arr.astype(int)   
+        
+        return return_arr 
         
     #This function selects the days corresponding to "range1" from the dataset "data".
-    #range1 is an array in the format of self.refperiod, a long list of rows in the form [year,doy]
+    #range1 is an array in the format of self.refperiod, a long list of rows in the form [julian_date]
     #data is  data, in the format of self.tmid_array
     def tmix_selection(self,range1,data):
-        #Rename the input variables, which are subject to change.
+        #Rename the input variable, which are subject to change.
         out=data
-        ref=range1
-        
-        #Select only the years.
-        year=out[:,0]
-
-        #Select only years in the data which are present in range1.
-        index = np.in1d(year,ref[:,0])
-        #Select only the subset of years defined by index.
-        out=out[index]
-        #Select only the days of year in ref.
-        index=np.in1d(out[:,3],ref[:,1])
+        #Now use Julian dates to filter down to the correct range.
+        index = np.in1d(out[:,5],range1)
+        #Select only the subset of time defined by index.
         out=out[index]
         return out
-    
-     #This takes a row from tmid_array, tmax_array, etc., and returns a formatted string.
-     #The excludeyear field excludes the year, which makes displaying the baseline period easier.
-    def date_from_row(self,row,excludeyear=False): 
-        if excludeyear == True:
-            return f"{int(row[1])}-{int(row[2])}"
-        if excludeyear != True:
-            return f"{int(row[0])}-{int(row[1])}-{int(row[2])}"
-
+            
+    """ANALYSIS FUNCTIONS"""
+    """
+    all_time_ref_annual_averages creates an array of average temperatures across the entire time period.
+    The average is evaluated only over the days provided in the reference period.
+    So if you provide only a month's worth of data, you see only the averages for that
+    month.'
+    """
+    def alltime_ref_annual_averages(self,):
+        yearsout=np.empty([0,2])
+        #Define the list of DOY to be included.
+        doy_list=np.arange(
+            self.period_information["First Unique DOY in Reference Period"],
+            self.period_information["Last Unique DOY in Reference Period"]+1)
+        #This extracts from tmid_array only the doy present in the reference period.
+        indexer = np.in1d(self.tmid_array[:,3],doy_list)
+        yearsdata=self.tmid_array[indexer]
         
+        uniqueyears=np.unique(yearsdata[:,0])
+        for year in uniqueyears[:-1]:   
+            #Select only the index values wehre the year is equal to year.
+            index=np.where(yearsdata[:,0]==year) 
+            all_years_data=yearsdata[index]
+            
+            #And then evaluates their mean. 
+            all_years_means=np.nanmean(all_years_data[:,4])
+            row=np.array([year,all_years_means])
+            yearsout=np.append(yearsout,[row],axis=0)
+        return yearsout
+    
+    #This creates an array with monthyl average temperatures. 
+    def alltime_annual_monthly_averages(self):
+        monthout=np.empty([12,2])
+        for month in np.arange(1,13):
+            #Select only the index values wehre the month is equal to month. 
+            index=np.where(self.tmid_array[:,1]==month)
+            #Then, selects values for this month
+            all_months_data=self.tmid_array[index,4]
+            #And evaluates their mean. 
+            all_months_means=np.nanmean(all_months_data)
+            monthout[month-1,0]=month
+            monthout[month-1,1]=all_months_means
+        return monthout
+
     """STATISTICAL TESTS ----------
     The following functions perform various statistical tests."""
     #This completes a t-test of the reference vs. baseline period TMID values. 
@@ -293,7 +272,7 @@ class StationAnalyzer :
             valdatestr=str(str(int(valyears[i]))+'-'+str(int(valmonths[i]))+"-"+str(int(valdays[i])))
             valuedates.append(valdatestr)
         return valuedates
-    
+    #PICK UP CLEANUP HERE
     #This creates a table (pd dataframe) of the key metrics of interest
     def key_metrics(self):       
         #ALL TIME METRICS -- first finds the metrics over the whole period.
@@ -345,20 +324,25 @@ class StationAnalyzer :
         
 
         #Creates strings describing the range of dates.
-        alltimestr1 = self.date_from_row(self.tmid_array[0])
-        alltimestr2 = self.date_from_row(self.tmid_array[-1])
-        #Creates strings describing the range of dates.
-        refstr1 = self.date_from_row(self.tmid_ref_data[0])
-        refstr2 = self.date_from_row(self.tmid_ref_data[-1])
+        alltimestr1 = f"{self.tmid_array[-1][0]}-{self.tmid_array[-1][1]}-{self.tmid_array[-1][2]}"
+        alltimestr2 = f"{self.tmid_array[-1][0]}-{self.tmid_array[-1][1]}-{self.tmid_array[-1][2]}"
+        
+        #Creates strings describing the range of dates. 
+        firstdayr,lastdayr=self.tmid_ref_data[0][0:3],self.tmid_ref_data[-1][0:3] #Find the year and days of year of the first and last entry in Reference period..
+        self.refstring = f"{firstdayr[1]}-{firstdayr[2]} to {lastdayr[1]}-{lastdayr[2]} in {firstdayr[0]} to {lastdayr[0]}" #Generate the string. 
+        firstdayb,lastdayb=self.tmid_base_data[0][0:3],self.tmid_base_data[-1][0:3] #Find the year and days of year of the first and last entry in baseline period.
+        basestring = f"{firstdayb[1]}-{lastdayb[2]} to {lastdayb[1]}-{lastdayb[2]} in {firstdayb[0]} to {lastdayb[0]}"#Generate the string. 
+
         #Just pull out the days. 
-        self.refdays = refstr1[5:]+" to "+refstr2[5:]
+        #self.refdays = refstr1[5:]+" to "+refstr2[5:]
         #This creates a dataframe of data points.
         returner = pd.DataFrame(
             {
              "Period of Measure":
-                 ["All Time:" +alltimestr1+" to "+alltimestr2,
-                 "Reference Period: "+refstr1+" to "+refstr2,
-                 "Baseline Period: "+self.base_period_string],
+                 ["All Time: " +alltimestr1+" to "+alltimestr2,
+                 "Reference: "+self.refstring,
+                 "Baseline: "+basestring],
+
                 "Average TMID over period (F)":[whole_tmid_mean,ref_tmid_mean,base_tmid_mean],
                 "Variance of TMID over period (F)":[whole_tmid_var,ref_tmid_var,base_tmid_var],
                 
@@ -497,7 +481,7 @@ class StationAnalyzer :
             text = "Entire Year"
         if nodays1 <= 364:
             text = str(nodays1)+" days in each year"
-        title = "Average Temperature (using TMID) for "+text+" between "+self.refdays+" each year"
+        title = "Average Temperature (using TMID) for "+text+" between "+self.refstring
         plt.plot(self.all_years_mean[:,0],self.all_years_mean[:,1])
         plt.plot(trend_x,trend_y, color='black',  linestyle='dashed')
         
