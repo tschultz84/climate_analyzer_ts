@@ -275,34 +275,11 @@ class StationAnalyzer :
     #PICK UP CLEANUP HERE
     #This creates a table (pd dataframe) of the key metrics of interest
     def key_metrics(self):       
-        #ALL TIME METRICS -- first finds the metrics over the whole period.
-        #This first does the calculations, finding TMID avreage, TMAx, and TMIn,
-        #of the entire record.
-        whole_tmid_mean=np.nanmean(self.tmid_array[:,4])
-        whole_tmax=np.nanmax(self.tmax_array[:,4])
-        whole_tmin=np.nanmin(self.tmin_array[:,4])
-        whole_tmid_var=np.nanvar(self.tmid_array[:,4])
-        
-        #Finds the dates of the maximum and minimum temperatures.  
-        maxdate = self.find_max_min_info(self.tmax_array)
-        mindate = self.find_max_min_info(self.tmin_array,MAX=False)
-       
-        #REFERENCE AND BASELINE PERIOD METRICS OF INTEREST
-        #First, select the data. 
-        refmiddata = self.tmix_selection(self.refperiod, self.tmid_array)
-        bmiddata = self.tmix_selection(self.baseperiod, self.tmid_array)
-        
+        #ALL TIME METRICS -- first finds the metrics o
+                   
         #This then calculates the mean over the ref and baseline periods. 
-        ref_tmid_mean=np.nanmean(refmiddata[:,4])
-        base_tmid_mean=np.nanmean(bmiddata[:,4])
-        
-        #This creates variables which can then be extracted. 
-        self.refmean = ref_tmid_mean
-        self.basemean = base_tmid_mean
-                 
-        #And variance. 
-        ref_tmid_var=np.nanvar(refmiddata[:,4])
-        base_tmid_var=np.nanvar(bmiddata[:,4])
+        ref_tmid_mean=np.nanmean(self.tmid_ref_data[:,4])
+        base_tmid_mean=np.nanmean(self.tmid_base_data[:,4])
         
         #And max, min values in the REF and BASE.
         #First, select the data. 
@@ -324,8 +301,9 @@ class StationAnalyzer :
         
 
         #Creates strings describing the range of dates.
-        alltimestr1 = f"{self.tmid_array[-1][0]}-{self.tmid_array[-1][1]}-{self.tmid_array[-1][2]}"
-        alltimestr2 = f"{self.tmid_array[-1][0]}-{self.tmid_array[-1][1]}-{self.tmid_array[-1][2]}"
+        alltimedates1,alltimedates2=self.tmid_array[0][0:3].astype(int),self.tmid_array[-1][0:3].astype(int)
+        alltimestr1 = f"{alltimedates1[0])}-{alltimedates1[1])}-{alltimedates1[2])}"
+        alltimestr2 = f"{alltimedates2[0])}-{alltimedates2[1])}-{alltimedates2[2])}"
         
         #Creates strings describing the range of dates. 
         firstdayr,lastdayr=self.tmid_ref_data[0][0:3],self.tmid_ref_data[-1][0:3] #Find the year and days of year of the first and last entry in Reference period..
@@ -338,29 +316,27 @@ class StationAnalyzer :
         #This creates a dataframe of data points.
         returner = pd.DataFrame(
             {
-             "Period of Measure":
-                 ["All Time: " +alltimestr1+" to "+alltimestr2,
-                 "Reference: "+self.refstring,
-                 "Baseline: "+basestring],
+             "Analysis Timeframe":["All Time","Reference Period","Baseline Period"],
+             "Time Period Covered":[alltimestr1+" to "+alltimestr2,self.refstring,basestring],
 
-                "Average TMID over period (F)":[whole_tmid_mean,ref_tmid_mean,base_tmid_mean],
-                "Variance of TMID over period (F)":[whole_tmid_var,ref_tmid_var,base_tmid_var],
+                "Average TMID over period (F)":[np.nanmean(self.tmid_array[:,4]),ref_tmid_mean,base_tmid_mean],
+                "Variance of TMID over period (F)":[np.nanvar(self.tmid_array[:,4]),np.nanvar(self.tmid_ref_data[:,4]),np.nanvar(self.tmid_base_data[:,4])],
                 
-                "Maximum Temperature over period (F)":[whole_tmax,ref_max,base_max],
-                "Date of Maximum Temperature":[maxdate,rmaxdate,bmaxdate],
-                "Minimum Temperature over period (F)":[whole_tmin,ref_min,base_min],
-                "Date of Minimum Temperature":[mindate,rmindate,bmindate],      
+                "Maximum Temperature over period (F)":[np.nanmax(self.tmax_array[:,4]),ref_max,base_max],
+                "Date of Maximum Temperature":[self.find_max_min_info(self.tmax_array),rmaxdate,bmaxdate],
+                "Minimum Temperature over period (F)":[np.nanmin(self.tmin_array[:,4]),ref_min,base_min],
+                "Date of Minimum Temperature":[self.find_max_min_info(self.tmin_array,MAX=False),rmindate,bmindate],      
              }
             )
         
         ##THese are key values to return out of the function.
         #You can grab these via the object handle. 
         self.alltimestr =alltimestr1+" to "+alltimestr2
-        self.whole_mean = whole_tmid_mean
-        self.whole_max_info = [whole_tmax,maxdate]
-        self.whole_min_info = [ whole_tmin,mindate]
-        self.ref_max_info = [ref_max,rmaxdate]
-        self.ref_min_info = [ref_min,rmindate]
+        
+        #self.whole_max_info = [whole_tmax,maxdate]
+        #self.whole_min_info = [ whole_tmin,mindate]
+        #self.ref_max_info = [ref_max,rmaxdate]
+        #self.ref_min_info = [ref_min,rmindate]
         
         
         t_test = self.do_t_test()
@@ -372,18 +348,10 @@ class StationAnalyzer :
         self.ref_base_delta = str(int((ref_tmid_mean-base_tmid_mean)*100)/100)
         #And the same with the pvalue.
         self.ref_pvalue = pvalue
-        
-        
-       # print("The Ref period is "+str(int((ref_tmid_mean-base_tmid_mean)*100)/100)+"F warmer than your base period.")
-       # print("Is this difference statistically different, ")
-        #print(" with a probability that this occured by chance less than "+str(self.alpha))
-        #print(" i.e., alpha is "+str(self.alpha)+str("?"))
-     
+             
         if pvalue >= self.alpha:
-           #print("No.")
            self.ref_stat_sig = False
         if pvalue < self.alpha:
-           #print("Yes.") 
            self.ref_stat_sig = True
 
         trend_data = self.create_trend_line(self.all_years_mean,False)
@@ -399,15 +367,12 @@ class StationAnalyzer :
         y5 = self.all_years_mean[-recentyears:,1]
         
         pearsond1 = pearsonr(x5,y5)
-                
-       # print("Outcome of Pearson Correlation Coefficient Analysis: ")
-       # print("Coefficient of Correlation (R): "+str(pearsond1[0]))
-       # print("Accompanying P value: "+str(100*pearsond1[1]))
+       
         if pearsond1[1] < self.alpha:
             is_real = True
         if pearsond1[1] >= self.alpha:
             is_real = False
-       # print("Is this trened real using Pearson correlation analysis? "+str(is_real))
+       
         #Variables to pull out.
         self.trend_p = pearsond1[1]
         self.trend_is_real = is_real
@@ -433,8 +398,7 @@ class StationAnalyzer :
                 
                 }
         )
-        #print(key_stats)
-        
+                
         self.key_metrics_table =returner
         self.key_stats = key_stats
         return returner   
