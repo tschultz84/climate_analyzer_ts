@@ -14,18 +14,37 @@ from IPython.display import display_html
 #The input is stationobj, which is an object output from the Station_Loader_ts object
 #the refst and refend are both strings, marking the beginning and end of the reference period of analysis
 #alpha is the alpha value (p-value threshold determining statistical signifiance)
+"""
+    The outputs are all described in the README file. 
+   The inputs are as follows:
+    *point is a list, in the form [latitude,longitude], which is the reference point 
+        (data will be loaded for the station closest to these coordinates where enough data
+        is available.)
+    *printupdate, is only used to display status updates for the script.If false, no updates are printed
+    *Min_days_per_mo is the minimum number of dasys of data which must be present for every month of a year for 
+        a dataset to be included. If not, then the year is excluded from dataset.
+    *Search_radius is the lat/lon degrees around the reference piont that are searched. Defaults to 1, meaning 
+        a searched is performed within 1 degree north, south, east, and west, of point.
+    *Firstyear is the earliest year which must be present in the dataset record for the weather station
+        to be loaded. (Note: The station must have data for the 2nd most recent year, i.e., in 2022, for 2021.)
+    *Basenoyears is the number of years in the baseline period.
+    *Min_recent_years is the minimum number of years before he present which must be present
+        for the statin to be loaded.
+    *Required_trend_years minimum number of years in the last 30 required to calculate this trend.
+        Weather stations without this many years present in the last 30 years of data will be discarded.
+    *Lastbaseyear is the last year in which the baseline is calculated (not the same as last year)
+"""
 
-#display prints the function outputs
-import json
-import os
 import Station_Loader_ts as load
 import imp
 imp.reload(load)
 
 class StationAnalyzer :
-    def __init__(self,point,display=True,alpha=0.01):
+    def __init__(self,point,display=True,alpha=0.01,Min_days_per_mo=15,Search_radius=3,Firstyear=1900,Basenoyears=30,
+            Min_recent_years=5,Required_trend_years =25,Lastbaseyear=1955):
         #Load the weather station. 
-        stationobj=load.LoadStation(point)
+        stationobj=load.LoadStation(point,False,Min_days_per_mo,Search_radius,Firstyear,Basenoyears,
+            Min_recent_years,Required_trend_years,Lastbaseyear)
 
         #Initialize some variables.
         self.alpha=alpha
@@ -41,16 +60,7 @@ class StationAnalyzer :
         
         #Initializes the reference dates. It initializes the reference period to 2015-1-1 to 2020-12-31.
         self.change_ref_dates([2015,2020])
-        
-        #Runs the key_metrics function if desired.
-        if self.display==True:
-            #Generate variables. 
-            self.key_metrics()
-            #show everything in a nice format. 
-            display_html(self.key_metrics)
-            display_html(self.key_stats)
-            self.key_charts()
-                
+                 
     #BEGIN FUNCTIONS
     """
     DATA CLEANING AND WRANGLING FUNCTIONS
@@ -74,7 +84,7 @@ class StationAnalyzer :
         if self.ref_date_1.to_julian_date()>self.ref_date_2.to_julian_date():        
             print("Your period dates are improperly defined. The first date must be before the second date.")
             sys.exit("Break Error due to bad dates.")
-        print(f"Reference dates have been re-defined.")
+        print(f"Reference dates have been defined.")
         print(f"Years: {self.ref_date_1.year} to {self.ref_date_2.year}.")
         print(f"Period Subset Included: {self.ref_date_1.month}-{self.ref_date_1.day} to {self.ref_date_2.month}-{self.ref_date_2.day}.")
         
@@ -114,14 +124,16 @@ class StationAnalyzer :
             "First Unique DOY in Reference Period":self.ref_date_1.day_of_year,
             "Last Unique DOY in Reference Period":self.ref_date_2.day_of_year
         })
-
+        print(f"I generated the reference and baseline period datasets accordingly. Their respective time periods are: {refstring} and {basestring}.")
         
         #Creates the actual values of TMID in the periods.
         self.tmid_ref_data=self.tmix_selection(self.refperiod,self.tmid_array)
         self.tmid_base_data=self.tmix_selection(self.baseperiod,self.tmid_array)
         self.all_years_mean=self.alltime_ref_annual_averages()
         self.all_months_mean = self.alltime_annual_monthly_averages()
-        print(f"I re-generated the reference and baseline period datasets accordingly. Their respective shapes: {self.tmid_ref_data.shape} and {self.tmid_base_data.shape}.")
+        self.key_metrics()
+        print("I generated all calculations for this reference period. ")
+        
 
     #This function creates beginning and end dates for two different pd datetimeIndex
     #objects, and creates a range of days, in the form of [Julian_date_1,Julian_date_2, etc...]
@@ -332,28 +344,21 @@ class StationAnalyzer :
              }
             )
         
+        #Do a t test comparing baseline and reference periods and grab the p-value. 
         t_test = self.do_t_test()
         pvalue = t_test[1]
-        
-        #First, create a string pulling out the difference between reference and baseline.
-        self.ref_base_delta = str(int((ref_tmid_mean-base_tmid_mean)*100)/100)
-       
-             
         if pvalue >= self.alpha: ref_stat_sig = False
         if pvalue < self.alpha: ref_stat_sig = True
 
+        #This then creates the trend data, used to evaluate the slope. 
         trend_data = self.create_trend_line(self.all_years_mean,False)
         
-        #This calculates the correlation coefficient and accompanying p-value
-        #which states whether this correlation is statistically significant. 
-        
-        #First, format, and take only the recent years of data.
+        #This calculates the correlation coefficient (i.e. trend) and accompanying p-value for the past 30 years. 
+        #This determines whether the trend is statistically significant. 
         recentyears=30 #using 30 years in the trend.
         x5 = self.all_years_mean[-recentyears:,0]
         y5 = self.all_years_mean[-recentyears:,1]
-        
         pearsond1 = pearsonr(x5,y5)
-       
         if pearsond1[1] < self.alpha:  is_real = True
         if pearsond1[1] >= self.alpha:  is_real = False
        
@@ -368,16 +373,16 @@ class StationAnalyzer :
                 }
         )
                 
-        self.key_metrics =returner
+        self.key_data =returner
         self.key_stats = key_stats
         return returner   
-    
-    #end key_metrics
               
      #This creates several charts of interest.
     def key_charts(self):
-        plt.rcParams['figure.figsize'] = [8, 6]
+        plt.rcParams['figure.figsize'] = [16, 10]
         
+        #Plot 1.
+        plt.subplot(2,2,1)
         #Creates a histogram of daily TMID values. 
         ref_hist=self.tmid_ref_data[:,4]
         base_hist=self.tmid_base_data[:,4]
@@ -387,15 +392,20 @@ class StationAnalyzer :
         plt.xlabel('Fraction of Total at this TMID')
         plt.ylabel('Temperature, F (TMID)')
         plt.legend()
-        plt.show()
-            
+        #plt.show()
+        
+        #Plot 2.
+        plt.subplot(2,2,2)
         #Creates a plot over one year of the monthyl average TMID temperatures. 
         plt.plot(self.all_months_mean[:,0],self.all_months_mean[:,1])
         plt.title('Monthly Average of TMID- All Time Record')
         plt.xlabel('Month')
         plt.ylabel('Monthly Average Temperature, F (TMID)')
-        plt.show()
+        #plt.show()
          
+
+        #Plot 3.
+        plt.subplot(2,2,3) 
         #This creates a lienar trend to superimpose on the chart.
         trenddat=self.create_trend_line(self.all_years_mean)
         #Pulls out the slope for chart labeling. 
@@ -408,27 +418,27 @@ class StationAnalyzer :
         #Creates a plot over time of the  average values. 
         #This is averaged over all_years_mean, which only includes days in the 
         #reference period, although for all years.
-        nodays1 = len(np.unique(self.refperiod[:,1]))
+        nodays1 = len(np.unique(self.tmid_ref_data[:,3]))
         if nodays1 > 364 :
             text = "Entire Year"
         if nodays1 <= 364:
             text = str(nodays1)+" days in each year"
-        title = "Average Temperature (using TMID) for "+text+" between "+self.period_information['Reference Period Description']
+        title = f"Average Temperature (using TMID) for {text} in the period {self.period_information['Reference Period Description']}"
         plt.plot(self.all_years_mean[:,0],self.all_years_mean[:,1])
         plt.plot(trend_x,trend_y, color='black',  linestyle='dashed')
         
-        plt.text(np.mean(trend_x),np.mean(trend_y)+1,str('Trend: '+str(round(slope*10,1))+"F/decade"),horizontalalignment='center')
+        plt.text(np.mean(trend_x),np.mean(trend_y)+1,f'Trend: {round(slope*10,1)} F/decade',horizontalalignment='center')
         plt.title(title)
         plt.xlabel('Year')
         plt.ylabel('Temperature, Farenheit')
         #This creates a span for the baseline which is superimposed on the chart. 
-        basespan_min=self.baseperiod[0,0]
-        basespan_max=self.baseperiod[-1,0]
+        basespan_min=self.tmid_base_data[0,0]
+        basespan_max=self.tmid_base_data[-1,0]
         plt.text((basespan_min + basespan_max)/2,np.nanmin(self.all_years_mean[:,1]),'Baseline',horizontalalignment='center')
         plt.axvspan(basespan_min, basespan_max, facecolor='g', alpha=0.5)
         #And the same for the reference period. 
-        refspan_min=self.refperiod[0,0]
-        refspan_max=self.refperiod[-1,0]
+        refspan_min=self.tmid_ref_data[0,0]
+        refspan_max=self.tmid_ref_data[-1,0]
         if refspan_min == refspan_max :
             refspan_max = refspan_max + 1
         plt.axvspan(refspan_min, refspan_max, facecolor='r', alpha=0.5)
